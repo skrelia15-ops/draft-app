@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { router, Href } from 'expo-router';
 import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
@@ -182,12 +182,6 @@ export default function ExploreScreen() {
     () => filterRoutes(ROUTES, activeFilter),
     [activeFilter],
   );
-
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ed8cb'},body:JSON.stringify({sessionId:'1ed8cb',location:'app/(tabs)/explore.tsx:mount',message:'ExploreScreen mounted',data:{activeFilter,routeCount:filteredRoutes.length,hasCoords:!!coords},timestamp:Date.now(),hypothesisId:'D',runId:'pre-fix'})}).catch(()=>{});
-    // #endregion
-  }, [activeFilter, filteredRoutes.length, coords]);
 
   const previewById = useMemo(() => {
     const map = new Map<string, ReturnType<typeof buildRoutePreview>>();

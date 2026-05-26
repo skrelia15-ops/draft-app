@@ -1,8 +1,7 @@
 /**
  * Riding-style Match model.
  *
- * Replaces the unexplained "DNA Match" metric with a clear, multi-factor
- * model the user can interpret at a glance:
+ * Clear, multi-factor riding-style model the user can interpret at a glance:
  *
  *   - a riding STYLE label (Endurance / Sprint / Casual) derived from the
  *     rider's own history, and

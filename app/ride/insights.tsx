@@ -2,11 +2,10 @@ import { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bolt } from '@solar-icons/react-native/Linear';
 import {
   ArrowUp,
   ArrowDown,
-  AltArrowRight,
+  Bolt,
   Cup,
   DangerCircle,
   Lightbulb,
@@ -15,7 +14,9 @@ import { colors, radius, spacing, typography } from '@/theme';
 import {
   computeInsights,
   formatDistanceMeters,
+  formatHourMin,
   useRide,
+  type RideRecord,
   type RideSegment,
 } from '@/lib/ride';
 
@@ -32,6 +33,12 @@ export default function InsightsScreen() {
     if (!lastFinished) return null;
     return computeInsights(lastFinished, previous);
   }, [lastFinished, previous]);
+
+  const averageComparison = useMemo(() => {
+    if (!lastFinished) return null;
+    const previousRides = history.filter((r) => r.id !== lastFinished.id);
+    return compareToAverage(lastFinished, previousRides);
+  }, [history, lastFinished]);
 
   const handleGoHome = () => {
     acknowledgeFinished();
@@ -71,6 +78,21 @@ export default function InsightsScreen() {
             : 'There\u2019s still room to save more energy.'}
         </Text>
 
+        <View style={styles.coreStatsGrid}>
+          <CoreStat
+            label="Distance"
+            value={formatDistanceMeters(lastFinished.distanceMeters)}
+          />
+          <CoreStat
+            label="Avg speed"
+            value={`${lastFinished.avgSpeedKmh.toFixed(1)} km/h`}
+          />
+          <CoreStat
+            label="Total time"
+            value={formatHourMin(lastFinished.durationSec)}
+          />
+        </View>
+
         {/* Headline: energy saved */}
         <View style={styles.energyCard}>
           <Bolt size={36} color={colors.primary} />
@@ -83,6 +105,9 @@ export default function InsightsScreen() {
           </Text>
           {insights.comparison && (
             <ComparisonBadge comparison={insights.comparison} />
+          )}
+          {averageComparison && (
+            <Text style={styles.averageComparison}>{averageComparison}</Text>
           )}
         </View>
 
@@ -110,7 +135,7 @@ export default function InsightsScreen() {
         {/* Best / worst segments */}
         {insights.bestSegment && (
           <SegmentCallout
-            title="BEST SEGMENT"
+            title="BEST DRAFTING SEGMENT"
             icon="best"
             segment={insights.bestSegment}
           />
@@ -148,7 +173,7 @@ export default function InsightsScreen() {
         {/* Recommendations */}
         {insights.recommendations.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>NEXT TIME</Text>
+            <Text style={styles.sectionTitle}>INSIGHTS</Text>
             {insights.recommendations.map((tip) => (
               <View key={tip} style={styles.bulletRow}>
                 <Lightbulb size={16} color={colors.primary} />
@@ -183,6 +208,39 @@ export default function InsightsScreen() {
       </Pressable>
     </View>
   );
+}
+
+function CoreStat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.coreStat}>
+      <Text style={styles.coreStatLabel}>{label}</Text>
+      <Text style={styles.coreStatValue}>{value}</Text>
+    </View>
+  );
+}
+
+function compareToAverage(current: RideRecord, history: RideRecord[]): string | null {
+  if (history.length === 0) return null;
+  const avgSpeed =
+    history.reduce((sum, ride) => sum + ride.avgSpeedKmh, 0) / history.length;
+  const avgDraft =
+    history.reduce((sum, ride) => sum + ride.draftingFraction, 0) /
+    history.length;
+  const speedDelta = current.avgSpeedKmh - avgSpeed;
+  const draftDelta = (current.draftingFraction - avgDraft) * 100;
+  const speedText =
+    Math.abs(speedDelta) < 0.5
+      ? 'matched your average pace'
+      : `${Math.abs(speedDelta).toFixed(1)} km/h ${
+          speedDelta > 0 ? 'faster' : 'slower'
+        } than average`;
+  const draftText =
+    Math.abs(draftDelta) < 2
+      ? 'with similar drafting time'
+      : `${Math.abs(Math.round(draftDelta))}% ${
+          draftDelta > 0 ? 'more' : 'less'
+        } drafting than average`;
+  return `Vs average ride: ${speedText}, ${draftText}.`;
 }
 
 function ComparisonBadge({
@@ -324,6 +382,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
+  coreStatsGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  coreStat: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.xl,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.inactiveOnDark,
+  },
+  coreStatLabel: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.semibold,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
+    marginBottom: spacing['3xs'],
+  },
+  coreStatValue: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size.sm,
+  },
   energyValueRow: {
     alignItems: 'center',
     marginTop: spacing.md,
@@ -368,6 +452,13 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
     flexShrink: 1,
+  },
+  averageComparison: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   sectionTitle: {
     color: colors.textMuted,

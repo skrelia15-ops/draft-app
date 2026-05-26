@@ -11,7 +11,7 @@ import {
 import * as Location from 'expo-location';
 
 import type { LatLng } from '@/lib/maps';
-import { draftingAt, soloBaselineWatts } from './drafting';
+import { draftingAt } from './drafting';
 import { liveWattsSaved, summarizeRide } from './insights';
 import { loadHistory, saveHistory } from './storage';
 import {
@@ -83,11 +83,7 @@ const RideContext = createContext<RideContextValue | null>(null);
 
 const RECENT_WINDOW_SAMPLES = 6;
 
-export function RideProvider({ children }: { children: ReactNode }) {
-  // #region agent log
-  fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ed8cb'},body:JSON.stringify({sessionId:'1ed8cb',location:'lib/ride/RideProvider.tsx:mount',message:'RideProvider mounted',data:{ok:true},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
-  // #endregion
-  const [phase, setPhase] = useState<RidePhase>('idle');
+export function RideProvider({ children }: { children: ReactNode }) {  const [phase, setPhase] = useState<RidePhase>('idle');
   const [liveStats, setLiveStats] = useState<RideLiveStats>(EMPTY_LIVE);
   const [history, setHistory] = useState<RideRecord[]>([]);
   const [lastFinished, setLastFinished] = useState<RideRecord | null>(null);
@@ -183,7 +179,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
       smoothedMs = haversineMeters(a, b) / dtSec;
     }
     const speedKmh = msToKmh(smoothedMs);
-    const avgSpeedKmh = speedCount > 0 ? msToKmh(speedSum / speedCount) : 0;
+    const avgSpeedKmh =
+      speedCount > 0
+        ? msToKmh(speedSum / speedCount)
+        : elapsedSec > 0
+          ? (distanceMeters / elapsedSec) * 3.6
+          : 0;
 
     const { drafting, efficiency } = draftingAt(rideId, elapsedSec);
     const wattsSavedNow = liveWattsSaved(efficiency);
@@ -422,11 +423,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
 export function useRide(): RideContextValue {
   const ctx = useContext(RideContext);
-  if (!ctx) {
-    // #region agent log
-    fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ed8cb'},body:JSON.stringify({sessionId:'1ed8cb',location:'lib/ride/RideProvider.tsx:useRide',message:'useRide called outside provider',data:{ctxNull:true},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
-    // #endregion
-    throw new Error('useRide must be used inside <RideProvider>.');
+  if (!ctx) {    throw new Error('useRide must be used inside <RideProvider>.');
   }
   return ctx;
 }

@@ -37,6 +37,17 @@ export type NearbyRider = {
   hint: string;
 };
 
+export type RiderCluster = {
+  id: string;
+  label: string;
+  direction: CompassDirection;
+  distanceMeters: number;
+  riderCount: number;
+  avgSpeedKmh: number;
+  potential: DraftPotential;
+  riders: NearbyRider[];
+};
+
 const DIRECTIONS: CompassDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
 const HANDLES = [
@@ -155,6 +166,59 @@ export function getNearbyRiders(
   );
 
   return out;
+}
+
+export function clusterNearbyRiders(riders: NearbyRider[]): RiderCluster[] {
+  const buckets = new Map<string, NearbyRider[]>();
+  for (const rider of riders) {
+    const directionBucket = rider.sameDirection ? rider.compass : 'CROSSING';
+    const distanceBucket =
+      rider.distanceMeters < 150
+        ? 'near'
+        : rider.distanceMeters < 350
+          ? 'mid'
+          : 'far';
+    const key = `${directionBucket}-${distanceBucket}`;
+    buckets.set(key, [...(buckets.get(key) ?? []), rider]);
+  }
+
+  const clusters = Array.from(buckets.entries()).map(([id, group]) => {
+    const avgDistance =
+      group.reduce((sum, rider) => sum + rider.distanceMeters, 0) / group.length;
+    const avgSpeed =
+      group.reduce((sum, rider) => sum + rider.paceKmh, 0) / group.length;
+    const bestPotential = group.reduce<DraftPotential>((best, rider) => {
+      return potentialRank(rider.potential) < potentialRank(best)
+        ? rider.potential
+        : best;
+    }, 'LOW');
+    const lead = group[0];
+    return {
+      id,
+      label:
+        group.length === 1
+          ? `${lead.name} ${lead.bearingLabel.toLowerCase()}`
+          : `${group.length} riders ${lead.bearingLabel.toLowerCase()}`,
+      direction: lead.compass,
+      distanceMeters: Math.round(avgDistance),
+      riderCount: group.length,
+      avgSpeedKmh: Math.round(avgSpeed * 10) / 10,
+      potential: bestPotential,
+      riders: group,
+    };
+  });
+
+  return clusters.sort(
+    (a, b) =>
+      potentialRank(a.potential) - potentialRank(b.potential) ||
+      a.distanceMeters - b.distanceMeters,
+  );
+}
+
+function potentialRank(potential: DraftPotential): number {
+  if (potential === 'HIGH') return 0;
+  if (potential === 'MEDIUM') return 1;
+  return 2;
 }
 
 function buildHint({

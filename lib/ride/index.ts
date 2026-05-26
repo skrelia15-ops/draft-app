@@ -8,8 +8,8 @@ export {
 export type { RideInsights, RideComparison } from './insights';
 export { getCurrentConditions } from './conditions';
 export type { Conditions, CompassDirection } from './conditions';
-export { getNearbyRiders } from './proximity';
-export type { NearbyRider, DraftPotential } from './proximity';
+export { clusterNearbyRiders, getNearbyRiders } from './proximity';
+export type { NearbyRider, DraftPotential, RiderCluster } from './proximity';
 export { getCompatibility } from './compat';
 export type { Compatibility, RidingStyle } from './compat';
 export { buildRoutePreview } from './sampleRoutes';

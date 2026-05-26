@@ -1,20 +1,23 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { router, Href } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bolt } from '@solar-icons/react-native/Bold';
 import {
   ArrowRight,
-  UsersGroupTwoRounded,
   Compass,
   Wind,
   InfoCircle,
+  MapArrowRight,
 } from '@solar-icons/react-native/Linear';
 import { colors, radius, spacing, typography } from '@/theme';
 import {
+  clusterNearbyRiders,
   getCompatibility,
   getCurrentConditions,
   getNearbyRiders,
   useRide,
+  type RiderCluster,
   type NearbyRider,
   type DraftPotential,
 } from '@/lib/ride';
@@ -23,20 +26,17 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 const TAB_BAR_SAFE_AREA = 110;
 
 export default function HomeScreen() {
-  // #region agent log
-  fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ed8cb'},body:JSON.stringify({sessionId:'1ed8cb',location:'app/(tabs)/index.tsx:beforeUseRide',message:'HomeScreen render start',data:{step:'before-useRide'},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
-  // #endregion
+  const insets = useSafeAreaInsets();
   const { history } = useRide();
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1ed8cb'},body:JSON.stringify({sessionId:'1ed8cb',location:'app/(tabs)/index.tsx:afterUseRide',message:'HomeScreen useRide succeeded',data:{historyLen:history.length},timestamp:Date.now(),hypothesisId:'A',runId:'pre-fix'})}).catch(()=>{});
-  }, [history.length]);
-  // #endregion
   const { coords } = useUserLocation();
 
   const conditions = useMemo(() => getCurrentConditions(), []);
   const riders = useMemo(() => getNearbyRiders(coords), [coords]);
-  const compatibility = useMemo(() => getCompatibility(history), [history]);
+  const clusters = useMemo(() => clusterNearbyRiders(riders), [riders]);
+  const compatibility = useMemo(
+    () => getCompatibility(history, riders),
+    [history, riders],
+  );
 
   const weeklyWatts = useMemo(() => {
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -58,7 +58,10 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + spacing.lg },
+      ]}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
@@ -119,13 +122,13 @@ export default function HomeScreen() {
           style={styles.primaryButton}
           onPress={() => router.push('/ride/map' as Href)}
         >
-          <Text style={styles.primaryButtonText}>START DRAFTING</Text>
+          <Text style={styles.primaryButtonText}>PLAN A RIDE</Text>
           <ArrowRight size={20} color={colors.textOnPrimary} />
         </Pressable>
       </View>
 
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>NEARBY RIDERS</Text>
+        <Text style={styles.sectionTitle}>RIDERS NEARBY</Text>
         <Pressable onPress={() => router.push('/explore' as Href)}>
           <Text style={styles.sectionLink}>VIEW MAP</Text>
         </Pressable>
@@ -138,17 +141,26 @@ export default function HomeScreen() {
           </Text>
         </View>
       ) : (
-        riders.slice(0, 3).map((rider) => (
-          <NearbyRiderRow
-            key={rider.id}
-            rider={rider}
-            onPress={() => router.push('/ride/map' as Href)}
-          />
-        ))
+        <>
+          {clusters.slice(0, 3).map((cluster) => (
+            <RiderClusterRow
+              key={cluster.id}
+              cluster={cluster}
+              onPress={() => router.push('/ride/map' as Href)}
+            />
+          ))}
+          {riders.slice(0, 2).map((rider) => (
+            <NearbyRiderRow
+              key={rider.id}
+              rider={rider}
+              onPress={() => router.push('/ride/map' as Href)}
+            />
+          ))}
+        </>
       )}
 
       <View style={[styles.sectionRow, styles.sectionRowSpaced]}>
-        <Text style={styles.sectionTitle}>DRAFT COMPATIBILITY</Text>
+        <Text style={styles.sectionTitle}>RIDING STYLE MATCH</Text>
         <Text style={styles.sectionMutedLabel}>{compatibility.tier}</Text>
       </View>
 
@@ -162,11 +174,12 @@ export default function HomeScreen() {
             <Text style={styles.compatScoreUnit}>/ 100</Text>
           </View>
           <View style={styles.compatBody}>
-            <Text style={styles.compatTitle}>How well you draft</Text>
+            <Text style={styles.compatTitle}>{compatibility.styleLabel}</Text>
             <View style={styles.compatExplainRow}>
               <InfoCircle size={14} color={colors.textMuted} />
               <Text style={styles.compatExplain} numberOfLines={2}>
-                {compatibility.explanation}
+                {compatibility.nearbyMatchPercent}% match with nearby riders ·{' '}
+                {compatibility.matchingRidersNearby} style match
               </Text>
             </View>
           </View>
@@ -191,6 +204,38 @@ export default function HomeScreen() {
         </View>
       </View>
     </ScrollView>
+  );
+}
+
+function RiderClusterRow({
+  cluster,
+  onPress,
+}: {
+  cluster: RiderCluster;
+  onPress: () => void;
+}) {
+  const tone = potentialColor(cluster.potential);
+  return (
+    <Pressable style={styles.clusterRow} onPress={onPress}>
+      <View style={[styles.clusterIcon, { borderColor: tone }]}>
+        <MapArrowRight size={22} color={tone} />
+      </View>
+      <View style={styles.riderBody}>
+        <View style={styles.riderTopRow}>
+          <Text style={styles.riderName}>{cluster.label}</Text>
+          <Text style={styles.riderPace}>{cluster.avgSpeedKmh.toFixed(1)} km/h</Text>
+        </View>
+        <Text style={styles.riderHint}>
+          {cluster.distanceMeters}m {cluster.direction} · {cluster.riderCount}{' '}
+          {cluster.riderCount === 1 ? 'rider' : 'riders'} to join
+        </Text>
+      </View>
+      <View style={[styles.potentialBadge, { borderColor: tone }]}>
+        <Text style={[styles.potentialText, { color: tone }]}>
+          {cluster.potential}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -273,7 +318,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing['4xl'],
     paddingBottom: TAB_BAR_SAFE_AREA,
   },
   header: {
@@ -462,6 +506,26 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.sm,
     marginBottom: spacing.sm,
+  },
+  clusterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.xl,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.inactiveOnDark,
+  },
+  clusterIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   riderIcon: {
     width: 44,

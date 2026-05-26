@@ -19,6 +19,7 @@ export default function RideLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="map" />
+      <Stack.Screen name="plan" />
       <Stack.Screen name="route-details" />
       <Stack.Screen
         name="active"

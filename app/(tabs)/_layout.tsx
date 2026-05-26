@@ -52,7 +52,7 @@ export default function TabsLayout() {
           tabBarButton: () => (
             <Pressable
               style={styles.centerButton}
-              onPress={() => router.push('/ride/plan' as Href)}
+              onPress={() => router.push('/ride/map' as Href)}
             >
               <View style={styles.centerButtonInner}>
                 <Bolt size={28} color={colors.textOnPrimary} />

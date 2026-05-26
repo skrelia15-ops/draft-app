@@ -14,26 +14,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { G, Path } from 'react-native-svg';
 import { colors, radius, spacing, typography } from '@/theme';
 
-// #region agent log
-fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '5cfb28' },
-  body: JSON.stringify({
-    sessionId: '5cfb28',
-    location: 'app/onboarding/index.tsx:module',
-    message: 'onboarding module colors import',
-    data: {
-      colorsType: typeof colors,
-      colorsIsUndefined: colors === undefined,
-      hasBlack: colors ? 'black' in colors : false,
-    },
-    timestamp: Date.now(),
-    hypothesisId: 'A',
-    runId: 'post-fix',
-  }),
-}).catch(() => {});
-// #endregion
-
 type SlideTheme = {
   background: string;
   textColor: string;

@@ -28,6 +28,7 @@ type RouteOption = {
   paceKmh: number;
   riders: number;
   draftPercent: number;
+  traffic: 'CLEAR' | 'MODERATE' | 'HEAVY';
   note?: string;
 };
 
@@ -41,6 +42,7 @@ const OPTIONS: RouteOption[] = [
     paceKmh: 32,
     riders: 8,
     draftPercent: 92,
+    traffic: 'MODERATE',
     note: 'Best drafting right now',
   },
   {
@@ -52,6 +54,7 @@ const OPTIONS: RouteOption[] = [
     paceKmh: 28,
     riders: 15,
     draftPercent: 88,
+    traffic: 'CLEAR',
   },
   {
     id: 'gravel',
@@ -62,6 +65,7 @@ const OPTIONS: RouteOption[] = [
     paceKmh: 24,
     riders: 4,
     draftPercent: 76,
+    traffic: 'HEAVY',
   },
 ];
 
@@ -139,8 +143,8 @@ export default function RouteDetailsScreen() {
           <ArrowLeft size={22} color={colors.textOnDark} />
         </Pressable>
         <View>
-          <Text style={styles.destLabel}>SUGGESTED ROUTES</Text>
-          <Text style={styles.destName}>{selected.name}</Text>
+          <Text style={styles.destLabel}>LOOP DESTINATION</Text>
+          <Text style={styles.destName}>Choose your route</Text>
         </View>
       </View>
 
@@ -216,7 +220,8 @@ export default function RouteDetailsScreen() {
             <Text style={styles.summaryLabel}>{shapeLabel(selected.shape)}</Text>
             <Text style={styles.summaryName}>{selected.name}</Text>
             <Text style={styles.summaryMeta}>
-              {selected.distanceKm} KM · {selected.difficulty} · {selected.paceKmh} KM/H
+              {selected.distanceKm} KM · {selected.paceKmh} KM/H · Traffic:{' '}
+              {trafficLabel(selected.traffic)}
             </Text>
           </View>
           <View style={styles.summaryRight}>
@@ -290,6 +295,17 @@ export default function RouteDetailsScreen() {
                   <Bolt size={16} color={colors.primary} />
                   <Text style={styles.routeStatText}>{option.draftPercent}% draft</Text>
                 </View>
+                <View style={styles.routeStatItem}>
+                  <View
+                    style={[
+                      styles.trafficDot,
+                      { backgroundColor: trafficColor(option.traffic) },
+                    ]}
+                  />
+                  <Text style={styles.routeStatText}>
+                    Traffic: {trafficLabel(option.traffic)}
+                  </Text>
+                </View>
               </View>
 
               {option.note && (
@@ -325,6 +341,18 @@ function shapeLabel(shape: RouteShape): string {
     case 'point-to-point':
       return 'POINT TO POINT';
   }
+}
+
+function trafficLabel(level: RouteOption['traffic']): string {
+  if (level === 'CLEAR') return 'Clear';
+  if (level === 'MODERATE') return 'Moderate';
+  return 'Heavy';
+}
+
+function trafficColor(level: RouteOption['traffic']): string {
+  if (level === 'CLEAR') return '#3FBF6E';
+  if (level === 'MODERATE') return '#F2A93B';
+  return '#E5484D';
 }
 
 const styles = StyleSheet.create({
@@ -616,7 +644,8 @@ const styles = StyleSheet.create({
   },
   routeStatsRow: {
     flexDirection: 'row',
-    gap: spacing.xl,
+    flexWrap: 'wrap',
+    gap: spacing.md,
   },
   routeStatItem: {
     flexDirection: 'row',
@@ -628,6 +657,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
+  },
+  trafficDot: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.pill,
   },
   routeNote: {
     flexDirection: 'row',

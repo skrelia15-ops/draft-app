@@ -202,6 +202,9 @@ export default function ActiveRideScreen() {
 
       {paused && (
         <PauseOverlay
+          elapsedText={elapsedText}
+          distanceText={distanceText}
+          avgSpeedText={`${liveStats.avgSpeedKmh.toFixed(1)} km/h`}
           onResume={resumeRide}
           onEnd={() => {
             finishRide();
@@ -214,9 +217,15 @@ export default function ActiveRideScreen() {
 }
 
 function PauseOverlay({
+  elapsedText,
+  distanceText,
+  avgSpeedText,
   onResume,
   onEnd,
 }: {
+  elapsedText: string;
+  distanceText: string;
+  avgSpeedText: string;
   onResume: () => void;
   onEnd: () => void;
 }) {
@@ -230,6 +239,20 @@ function PauseOverlay({
           Stats are frozen. Time, distance and energy stop counting until you
           resume.
         </Text>
+        <View style={styles.overlayStats}>
+          <View style={styles.overlayStat}>
+            <Text style={styles.overlayStatLabel}>TIME</Text>
+            <Text style={styles.overlayStatValue}>{elapsedText}</Text>
+          </View>
+          <View style={styles.overlayStat}>
+            <Text style={styles.overlayStatLabel}>DISTANCE</Text>
+            <Text style={styles.overlayStatValue}>{distanceText}</Text>
+          </View>
+          <View style={styles.overlayStat}>
+            <Text style={styles.overlayStatLabel}>AVG SPEED</Text>
+            <Text style={styles.overlayStatValue}>{avgSpeedText}</Text>
+          </View>
+        </View>
         <Pressable style={styles.overlayPrimary} onPress={onResume}>
           <Play size={18} color={colors.textOnPrimary} />
           <Text style={styles.overlayPrimaryText}>RESUME</Text>
@@ -490,6 +513,31 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     lineHeight: typography.size.sm * typography.lineHeight.normal,
     marginBottom: spacing.xs,
+  },
+  overlayStats: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.inactiveOnDark,
+    marginBottom: spacing.xs,
+  },
+  overlayStat: {
+    flex: 1,
+  },
+  overlayStatLabel: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.semibold,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
+    marginBottom: spacing['3xs'],
+  },
+  overlayStatValue: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size.sm,
   },
   overlayPrimary: {
     flexDirection: 'row',

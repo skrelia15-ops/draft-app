@@ -44,6 +44,7 @@ import {
   type PlacePrediction,
   type RouteResult,
 } from '@/lib/maps';
+import { useRide } from '@/lib/ride';
 
 /**
  * Default region centered on Manhattan — used briefly before the first
@@ -89,6 +90,7 @@ type Field = 'origin' | 'destination';
 
 export default function RideMapScreen() {
   const insets = useSafeAreaInsets();
+  const { startRide } = useRide();
 
   const mapRef = useRef<MapView | null>(null);
   const originInputRef = useRef<TextInput | null>(null);
@@ -363,11 +365,23 @@ export default function RideMapScreen() {
 
   const handleStartRide = useCallback(() => {
     if (routeState.kind !== 'ready') return;
+    const route = routeState.route;
     setNavigating(true);
     setActiveField(null);
     Keyboard.dismiss();
+    startRide({
+      routeName: destination.query || route.endAddress || 'Planned ride',
+      routeCoordinates: route.coordinates,
+      routeDistanceMeters: route.distanceMeters,
+      origin: origin.coords ?? route.coordinates[0],
+      destination: destination.coords ?? route.coordinates[route.coordinates.length - 1],
+      fallbackPaceKmh:
+        route.durationSeconds > 0
+          ? (route.distanceMeters / route.durationSeconds) * 3.6
+          : 28,
+    });
     router.push('/ride/active' as Href);
-  }, [routeState]);
+  }, [destination, origin.coords, routeState, startRide]);
 
   const handleRetryRoute = useCallback(() => {
     if (!origin.coords || !destination.coords) return;
@@ -900,13 +914,11 @@ function RouteSummary({
    * for cycling).
    */
   const traffic = useMemo(() => {
-    if (routeState.kind !== 'ready') return null;
-    const r = routeState.route;
-    if (!r.durationInTrafficSeconds) return null;
-    const ratio = r.durationInTrafficSeconds / r.durationSeconds;
-    if (ratio < 1.1) return { level: 'CLEAR', color: '#3FBF6E' };
-    if (ratio < 1.4) return { level: 'MODERATE', color: '#F2A93B' };
-    return { level: 'HEAVY', color: '#E5484D' };
+    if (routeState.kind !== 'ready' || !routeState.route.trafficLevel) return null;
+    const level = routeState.route.trafficLevel;
+    if (level === 'CLEAR') return { level, color: '#3FBF6E' };
+    if (level === 'MODERATE') return { level, color: '#F2A93B' };
+    return { level, color: '#E5484D' };
   }, [routeState]);
 
   if (routeState.kind === 'loading') {
@@ -958,6 +970,15 @@ function RouteSummary({
             <View style={[styles.trafficDot, { backgroundColor: traffic.color }]} />
             <Text style={styles.trafficText}>
               TRAFFIC · {traffic.level}
+            </Text>
+          </View>
+        )}
+        {traffic?.level === 'HEAVY' && (
+          <View style={styles.fallbackBadge}>
+            <Text style={styles.fallbackText}>
+              {r.alternativeCount > 0
+                ? `${r.alternativeCount} alternate route${r.alternativeCount === 1 ? '' : 's'} available`
+                : 'Consider a suggested loop instead'}
             </Text>
           </View>
         )}

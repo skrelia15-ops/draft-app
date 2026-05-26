@@ -258,7 +258,12 @@ export function summarizeRide(args: {
     }
   }
 
-  const avgSpeedMs = speedCount > 0 ? speedSum / speedCount : 0;
+  const avgSpeedMs =
+    speedCount > 0
+      ? speedSum / speedCount
+      : durationSec > 0
+        ? distanceMeters / durationSec
+        : 0;
   const draftingFraction = totalMs > 0 ? draftMs / totalMs : 0;
 
   // Energy maths — drafting saves ~30% of effort vs solo. Weight by how

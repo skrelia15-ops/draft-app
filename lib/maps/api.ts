@@ -228,6 +228,8 @@ export type RouteResult = {
   };
   endAddress: string;
   startAddress: string;
+  trafficLevel: 'CLEAR' | 'MODERATE' | 'HEAVY' | null;
+  alternativeCount: number;
 };
 
 type DirectionsResponse = {
@@ -284,6 +286,7 @@ async function fetchDirections(
     origin: `${origin.latitude},${origin.longitude}`,
     destination: `${destination.latitude},${destination.longitude}`,
     mode,
+    alternatives: 'true',
     key,
   });
   // duration_in_traffic is only returned for driving + departure_time.
@@ -308,6 +311,10 @@ async function fetchDirections(
 
   const route = data.routes[0];
   const leg = route.legs[0];
+  const trafficLevel = classifyTraffic(
+    leg.duration.value,
+    leg.duration_in_traffic?.value,
+  );
   return {
     mode,
     distanceMeters: leg.distance.value,
@@ -329,7 +336,20 @@ async function fetchDirections(
     },
     endAddress: leg.end_address,
     startAddress: leg.start_address,
+    trafficLevel,
+    alternativeCount: Math.max(0, (data.routes?.length ?? 1) - 1),
   };
+}
+
+function classifyTraffic(
+  durationSeconds: number,
+  durationInTrafficSeconds?: number,
+): RouteResult['trafficLevel'] {
+  if (!durationInTrafficSeconds || durationSeconds <= 0) return null;
+  const ratio = durationInTrafficSeconds / durationSeconds;
+  if (ratio < 1.1) return 'CLEAR';
+  if (ratio < 1.4) return 'MODERATE';
+  return 'HEAVY';
 }
 
 /**
@@ -344,7 +364,21 @@ export async function getCyclingDirections(
   signal?: AbortSignal,
 ): Promise<RouteResult> {
   const cycling = await fetchDirections(origin, destination, 'bicycling', signal);
-  if (cycling) return cycling;
+  if (cycling) {
+    try {
+      const road = await fetchDirections(origin, destination, 'driving', signal);
+      if (road) {
+        return {
+          ...cycling,
+          trafficLevel: road.trafficLevel,
+          alternativeCount: road.alternativeCount,
+        };
+      }
+    } catch {
+      // Cycling route remains valid even when the traffic probe fails.
+    }
+    return cycling;
+  }
 
   const driving = await fetchDirections(origin, destination, 'driving', signal);
   if (driving) return driving;

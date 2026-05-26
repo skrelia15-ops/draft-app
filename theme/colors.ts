@@ -40,24 +40,3 @@ export const colors = {
 } as const;
 
 export type ColorToken = keyof typeof colors;
-
-// #region agent log
-fetch('http://127.0.0.1:7579/ingest/50ab54ea-04ae-4695-90b6-ffc8b34d4312', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '5cfb28' },
-  body: JSON.stringify({
-    sessionId: '5cfb28',
-    location: 'theme/colors.ts:module',
-    message: 'colors module loaded',
-    data: {
-      colorCount: Object.keys(colors).length,
-      hasBlack: 'black' in colors,
-      hasSurfaceElevated: 'surfaceElevated' in colors,
-      primary: colors.primary,
-    },
-    timestamp: Date.now(),
-    hypothesisId: 'A',
-    runId: 'post-fix',
-  }),
-}).catch(() => {});
-// #endregion
