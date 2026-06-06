@@ -79,6 +79,8 @@ const config: ExpoConfig = {
   },
   extra: {
     googleMapsApiKey,
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
+    supabasePublishableKey: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '',
   },
 };
 
