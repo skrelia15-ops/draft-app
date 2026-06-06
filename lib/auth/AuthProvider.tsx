@@ -4,9 +4,21 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+
+/**
+ * Google Sign-In is a native module that is NOT bundled in Expo Go — its
+ * top-level `TurboModuleRegistry.getEnforcing('RNGoogleSignin')` throws on
+ * import there and would crash the whole app on boot. So we load it lazily
+ * (only when Google sign-in is actually used / configured). In Expo Go the
+ * require throws and is handled gracefully; in a dev build it resolves.
+ */
+type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin').GoogleSignin;
+
+function loadGoogleSignin(): GoogleSigninModule {
+  return require('@react-native-google-signin/google-signin').GoogleSignin;
+}
 
 type AuthContextValue = {
   session: Session | null;
@@ -67,6 +79,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
+    let GoogleSignin: GoogleSigninModule;
+    try {
+      GoogleSignin = loadGoogleSignin();
+    } catch {
+      throw new Error('Google Sign-In needs a development build (not available in Expo Go).');
+    }
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
     const idToken = userInfo.data?.idToken;
@@ -79,12 +97,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  // Configure Google client IDs once. Real IDs are added later (deferred external setup).
+  // Configure Google client IDs once. Wrapped in try/catch because the
+  // native module is absent in Expo Go (loadGoogleSignin throws there);
+  // Google sign-in stays unavailable until a dev build, which is fine.
   useEffect(() => {
-    GoogleSignin.configure({
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    });
+    try {
+      loadGoogleSignin().configure({
+        iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      });
+    } catch {
+      // Native module unavailable (e.g. Expo Go) — skip configuration.
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
