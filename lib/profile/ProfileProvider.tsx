@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { supabase } from '@/lib/supabase';
 import { loadProfile, saveProfile } from './storage';
 import { DEFAULT_PROFILE, type Profile } from './types';
 
@@ -30,10 +31,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    loadProfile().then((p) => {
-      setProfile(p);
-      setIsHydrated(true);
+    const sync = () => {
+      loadProfile().then((p) => {
+        setProfile(p);
+        setIsHydrated(true);
+      });
+    };
+    sync();
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      setIsHydrated(false);
+      setProfile(DEFAULT_PROFILE);
+      sync();
     });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const update = useCallback(

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import * as Location from 'expo-location';
 
+import { supabase } from '@/lib/supabase';
 import type { LatLng } from '@/lib/maps';
 import { draftingAt } from './drafting';
 import { liveWattsSaved, summarizeRide } from './insights';
@@ -113,9 +114,13 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
   const routeNameRef = useRef<string | null>(null);
   const fallbackPaceKmhRef = useRef<number>(28);
 
-  // Bootstrap: load persisted history once.
+  // Bootstrap: load persisted history once, and reload on auth state change.
   useEffect(() => {
     loadHistory().then(setHistory);
+    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+      loadHistory().then(setHistory);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   // ── Helpers ───────────────────────────────────────────────────────────
