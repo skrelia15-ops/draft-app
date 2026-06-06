@@ -35,8 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+    // With email confirmation enabled, signing up an already-registered
+    // address returns no error and a user with an empty `identities` array
+    // (Supabase obfuscates existence). Surface it instead of sending the
+    // user to a "check your inbox" dead end.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      throw new Error('An account with this email already exists. Please sign in.');
+    }
   }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {

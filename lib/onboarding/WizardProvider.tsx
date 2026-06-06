@@ -27,8 +27,12 @@ type WizardDraft = {
 type WizardContextValue = {
   draft: WizardDraft;
   setDraft: (patch: Partial<WizardDraft>) => void;
-  /** Persist the collected draft to the profile store. */
-  commit: () => Promise<void>;
+  /**
+   * Persist the collected draft to the profile store. Pass a final `override`
+   * for values set in the same tick as the call (e.g. the bike on FINISH),
+   * since those wouldn't yet be reflected in `draft` via setState.
+   */
+  commit: (override?: Partial<WizardDraft>) => Promise<void>;
 };
 
 const WizardContext = createContext<WizardContextValue | null>(null);
@@ -49,13 +53,17 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setDraftState((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const commit = useCallback(async () => {
-    await update({
-      name: draft.name.trim(),
-      skillLevel: draft.skillLevel,
-      bike: draft.bike,
-    });
-  }, [draft, update]);
+  const commit = useCallback(
+    async (override?: Partial<WizardDraft>) => {
+      const final = { ...draft, ...override };
+      await update({
+        name: final.name.trim(),
+        skillLevel: final.skillLevel,
+        bike: final.bike,
+      });
+    },
+    [draft, update],
+  );
 
   const value = useMemo<WizardContextValue>(
     () => ({ draft, setDraft, commit }),

@@ -13,13 +13,14 @@ import { DEFAULT_PROFILE, type Profile } from './types';
 
 /**
  * Wraps the profile in a tiny store so every screen pulls from the same
- * source. The provider hydrates from AsyncStorage on mount and writes
- * back on every update; screens just call `update(partial)`.
+ * source. The provider loads the signed-in user's profile from Supabase
+ * and reloads it whenever the signed-in user changes; screens just call
+ * `update(partial)`.
  */
 
 type ProfileContextValue = {
   profile: Profile;
-  /** True until the first AsyncStorage read resolves. */
+  /** True once the profile for the current session has loaded. */
   isHydrated: boolean;
   update: (patch: Partial<Profile>) => Promise<Profile>;
 };
@@ -31,17 +32,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const sync = () => {
+    // onAuthStateChange fires INITIAL_SESSION on subscribe (initial load),
+    // then on SIGNED_IN/OUT and token refreshes. Only reload when the
+    // signed-in user actually changes, so an hourly token refresh doesn't
+    // blank the in-memory profile mid-session.
+    let lastUid: string | null | undefined;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid === lastUid) return;
+      lastUid = uid;
+      setIsHydrated(false);
+      setProfile(DEFAULT_PROFILE);
       loadProfile().then((p) => {
         setProfile(p);
         setIsHydrated(true);
       });
-    };
-    sync();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
-      setIsHydrated(false);
-      setProfile(DEFAULT_PROFILE);
-      sync();
     });
     return () => sub.subscription.unsubscribe();
   }, []);

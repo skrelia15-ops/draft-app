@@ -24,7 +24,7 @@ const BIKE_WEIGHT_MAX = 20;
  * commits with the entered bike. Both end on the tabs.
  */
 export default function BikeScreen() {
-  const { setDraft, commit } = useWizard();
+  const { commit } = useWizard();
 
   const [bikeName, setBikeName] = useState('');
   const [bikeType, setBikeType] = useState<BikeType>('Road');
@@ -35,9 +35,8 @@ export default function BikeScreen() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      // Ensure no bike is persisted on the skip path.
-      setDraft({ bike: null });
-      await commit();
+      // No bike on the skip path.
+      await commit({ bike: null });
       router.replace('/(tabs)' as Href);
     } catch {
       toast.error('Could not save your profile', {
@@ -65,14 +64,13 @@ export default function BikeScreen() {
 
     setSubmitting(true);
     try {
-      setDraft({
+      await commit({
         bike: {
           name: bikeName.trim() || 'My bike',
           type: bikeType,
           weightKg: Math.round(weightNumber * 10) / 10,
         },
       });
-      await commit();
       router.replace('/(tabs)' as Href);
     } catch {
       toast.error('Could not save your profile', {

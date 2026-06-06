@@ -34,7 +34,7 @@ import type {
  *   - the phase machine (idle → active → paused → finished)
  *   - the in-flight GPS sample buffer
  *   - live derived stats (speed, distance, ETA, draft efficiency)
- *   - persistence into AsyncStorage
+ *   - persistence into Supabase
  *
  * Designed so the Map → Active → Complete → Insights screens can all
  * pull from a single source of truth without each screen having to be
@@ -114,10 +114,16 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
   const routeNameRef = useRef<string | null>(null);
   const fallbackPaceKmhRef = useRef<number>(28);
 
-  // Bootstrap: load persisted history once, and reload on auth state change.
+  // Load the signed-in user's history. onAuthStateChange fires
+  // INITIAL_SESSION on subscribe (initial load) and again on sign in/out;
+  // only reload when the user actually changes so token refreshes don't
+  // trigger redundant fetches.
   useEffect(() => {
-    loadHistory().then(setHistory);
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    let lastUid: string | null | undefined;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid === lastUid) return;
+      lastUid = uid;
       loadHistory().then(setHistory);
     });
     return () => sub.subscription.unsubscribe();
