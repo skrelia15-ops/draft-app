@@ -23,8 +23,12 @@ export default function SignUpConfirmScreen() {
       return;
     }
     try {
-      await signUpWithEmail(email, password);
-      router.replace('/auth/sign-up/check-email' as Href);
+      const { needsConfirmation } = await signUpWithEmail(email, password);
+      if (needsConfirmation) {
+        router.replace('/auth/sign-up/check-email' as Href);
+      }
+      // Otherwise a session was created and the root gate sends the user
+      // straight into the profile wizard — no need to navigate here.
     } catch (e: any) {
       toast.error('Sign up failed', { text2: e?.message });
     }

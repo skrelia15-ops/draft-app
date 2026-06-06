@@ -29,7 +29,9 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   isLoading: boolean;
-  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  /** Resolves with whether the user must confirm their email before they
+   *  have a session (true when "Confirm email" is on in Supabase). */
+  signUpWithEmail: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -61,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user && data.user.identities && data.user.identities.length === 0) {
       throw new Error('An account with this email already exists. Please sign in.');
     }
+    // No session means email confirmation is required before sign-in.
+    return { needsConfirmation: !data.session };
   }, []);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
