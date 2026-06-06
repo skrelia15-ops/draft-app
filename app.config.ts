@@ -63,6 +63,15 @@ const config: ExpoConfig = {
           'Allow DRAFT to use your location to plan rides and show traffic-aware routes.',
       },
     ],
+    [
+      'expo-image-picker',
+      {
+        photosPermission:
+          'Allow DRAFT to access your photos so you can set a profile picture.',
+        cameraPermission:
+          'Allow DRAFT to use your camera so you can take a profile picture.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

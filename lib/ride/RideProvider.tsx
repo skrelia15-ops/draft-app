@@ -81,7 +81,14 @@ const EMPTY_LIVE: RideLiveStats = {
 
 const RideContext = createContext<RideContextValue | null>(null);
 
+// How many GPS samples to keep in the rolling average for smoothed
+// current speed. Larger = smoother but laggy; smaller = jumpier.
 const RECENT_WINDOW_SAMPLES = 6;
+
+// Speed (m/s) below which the rider is treated as stationary — i.e.
+// drafting, energy savings, and ETA fall back to zero/inert. 1.0 m/s ≈
+// 3.6 km/h, slow walking pace. Anything slower is GPS noise or a stop.
+const MOVING_THRESHOLD_MS = 1;
 
 export function RideProvider({ children }: { children: ReactNode }) {  const [phase, setPhase] = useState<RidePhase>('idle');
   const [liveStats, setLiveStats] = useState<RideLiveStats>(EMPTY_LIVE);
@@ -126,7 +133,14 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
       if (!rideId) return;
       const elapsedMs = activeElapsedMs();
       const elapsedSec = Math.max(0, elapsedMs / 1000);
-      const { drafting } = draftingAt(rideId, elapsedSec);
+      // Only consider the rider "drafting" if they're actually moving —
+      // the synthetic drafting model is time-based, so without a motion
+      // gate a stationary rider would accumulate fake drafting time and
+      // fake energy savings.
+      const isMoving = speedMs > MOVING_THRESHOLD_MS;
+      const { drafting } = isMoving
+        ? draftingAt(rideId, elapsedSec)
+        : { drafting: false };
       const sample: RideSample = {
         t: elapsedMs,
         capturedAt: Date.now(),
@@ -186,16 +200,22 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
           ? (distanceMeters / elapsedSec) * 3.6
           : 0;
 
-    const { drafting, efficiency } = draftingAt(rideId, elapsedSec);
-    const wattsSavedNow = liveWattsSaved(efficiency);
+    // Drafting + energy savings require actual motion. Without this
+    // gate the time-based `draftingAt` model would report drafting +
+    // watts saved while the rider sits still waiting for GPS lock.
+    const isMoving = smoothedMs > MOVING_THRESHOLD_MS;
+    const { drafting, efficiency } = isMoving
+      ? draftingAt(rideId, elapsedSec)
+      : { drafting: false, efficiency: 0 };
+    const wattsSavedNow = isMoving ? liveWattsSaved(efficiency) : 0;
 
     let remainingMeters: number | null = null;
     let etaSec: number | null = null;
     if (routeDistanceRef.current != null) {
       remainingMeters = Math.max(0, routeDistanceRef.current - distanceMeters);
-      const speedForEta = smoothedMs > 1
+      const speedForEta = isMoving
         ? smoothedMs
-        : (fallbackPaceKmhRef.current / 3.6);
+        : fallbackPaceKmhRef.current / 3.6;
       etaSec = remainingMeters / speedForEta;
     } else if (destRef.current && samples.length > 0) {
       const last = samples[samples.length - 1];
@@ -203,10 +223,15 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
         { latitude: last.latitude, longitude: last.longitude },
         destRef.current,
       );
-      const speedForEta = smoothedMs > 1
+      const speedForEta = isMoving
         ? smoothedMs
-        : (fallbackPaceKmhRef.current / 3.6);
+        : fallbackPaceKmhRef.current / 3.6;
       etaSec = remainingMeters / speedForEta;
+    }
+    // Cap absurd ETAs (no GPS / no motion / huge distance) so we don't
+    // render "42 days to go" in the UI.
+    if (etaSec != null && etaSec > 12 * 60 * 60) {
+      etaSec = null;
     }
 
     setLiveStats({

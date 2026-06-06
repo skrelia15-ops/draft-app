@@ -10,7 +10,10 @@ import {
   DarkerGrotesque_800ExtraBold,
 } from '@expo-google-fonts/darker-grotesque';
 import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
 import { RideProvider } from '@/lib/ride';
+import { ProfileProvider } from '@/lib/profile';
+import { toastConfig } from '@/components/ui/draft/toast-config';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,16 +40,20 @@ export default function RootLayout() {
   }
 
   return (
-    <RideProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="ride"
-          options={{ presentation: 'fullScreenModal' }}
-        />
-      </Stack>
-      <StatusBar style="light" />
-    </RideProvider>
+    <ProfileProvider>
+      <RideProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="ride"
+            options={{ presentation: 'fullScreenModal' }}
+          />
+          <Stack.Screen name="goals" />
+        </Stack>
+        <StatusBar style="light" />
+        <Toast config={toastConfig} />
+      </RideProvider>
+    </ProfileProvider>
   );
 }

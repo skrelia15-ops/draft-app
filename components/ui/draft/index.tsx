@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 import { colors, radius, spacing, typography } from '@/theme';
 
+// Re-export sibling components so screens can pull everything from
+// `@/components/ui/draft` regardless of which file owns each piece.
+export { GoalsCard, buildGoalDays, type Goal } from './GoalsCard';
+
 export const ui = {
   softShadow: {
     shadowColor: '#000000',
@@ -248,6 +252,107 @@ export function SecondaryButton({
   );
 }
 
+type SegmentedTabsProps<T extends string> = {
+  /** Stable identifier list (also used as label text by default). */
+  options: readonly T[];
+  value: T;
+  onChange: (next: T) => void;
+  /** Optional label override (`option -> displayed text`). */
+  labelFor?: (option: T) => string;
+  /** Render style — defaults to `underline`. */
+  variant?: 'underline' | 'pill';
+  /** Horizontal padding applied to the scroll content. */
+  contentInsetHorizontal?: number;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Reusable horizontally-scrolling tab strip — used for "WITH DRAFT /
+ * SCENIC / POPULAR …" style filters across the app. Pick ONE visual
+ * variant (`underline` is the default) and stick with it; mixing pill +
+ * underline reads as two competing affordances.
+ */
+export function SegmentedTabs<T extends string>({
+  options,
+  value,
+  onChange,
+  labelFor,
+  variant = 'underline',
+  contentInsetHorizontal,
+  style,
+}: SegmentedTabsProps<T>) {
+  return (
+    <View style={[styles.segmentedTabsRow, style]}>
+      <View
+        style={[
+          styles.segmentedTabsTrack,
+          contentInsetHorizontal != null && {
+            paddingHorizontal: contentInsetHorizontal,
+          },
+        ]}
+      >
+        {options.map((option) => {
+          const active = option === value;
+          const label = labelFor ? labelFor(option) : option;
+
+          if (variant === 'pill') {
+            return (
+              <Pressable
+                key={option}
+                onPress={() => onChange(option)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                style={({ pressed }) => [
+                  styles.segmentedPill,
+                  active && styles.segmentedPillActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.segmentedPillText,
+                    active && styles.segmentedPillTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          }
+
+          return (
+            <Pressable
+              key={option}
+              onPress={() => onChange(option)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              style={({ pressed }) => [
+                styles.segmentedUnderlineItem,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.segmentedUnderlineText,
+                  active && styles.segmentedUnderlineTextActive,
+                ]}
+              >
+                {label}
+              </Text>
+              <View
+                style={[
+                  styles.segmentedUnderlineBar,
+                  active && styles.segmentedUnderlineBarActive,
+                ]}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 type SegmentedProgressProps = {
   achieved: number;
   activeIndex: number;
@@ -446,6 +551,63 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.sm,
     letterSpacing: typography.letterSpacing.wide,
+  },
+  segmentedTabsRow: {
+    width: '100%',
+  },
+  segmentedTabsTrack: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing.lg,
+  },
+  // Tab item styling matches Figma node 8021:280 — 18px Darker Grotesque
+  // Bold uppercase, full white on active vs 30% white on inactive, with
+  // a yellow underline that only shows under the active label.
+  segmentedUnderlineItem: {
+    paddingVertical: spacing.xs,
+    alignItems: 'flex-start',
+    gap: spacing.lg,
+  },
+  segmentedUnderlineText: {
+    color: 'rgba(241,241,241,0.3)',
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.md,
+    lineHeight: typography.size.md * typography.lineHeight.tight,
+    textTransform: 'uppercase',
+  },
+  segmentedUnderlineTextActive: {
+    color: colors.textOnDark,
+  },
+  segmentedUnderlineBar: {
+    height: 1,
+    width: '100%',
+    backgroundColor: 'transparent',
+  },
+  segmentedUnderlineBarActive: {
+    backgroundColor: colors.primary,
+    height: 1,
+  },
+  segmentedPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  segmentedPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  segmentedPillText: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.xs,
+    letterSpacing: typography.letterSpacing.wide,
+    textTransform: 'uppercase',
+  },
+  segmentedPillTextActive: {
+    color: colors.textOnPrimary,
   },
   segmentRow: {
     flexDirection: 'row',

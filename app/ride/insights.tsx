@@ -1,16 +1,3 @@
-import { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { router, type Href } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ArrowUp,
-  ArrowDown,
-  Bolt,
-  Cup,
-  DangerCircle,
-  Lightbulb,
-} from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
 import {
   computeInsights,
   formatDistanceMeters,
@@ -19,6 +6,19 @@ import {
   type RideRecord,
   type RideSegment,
 } from '@/lib/ride';
+import { colors, radius, spacing, typography } from '@/theme';
+import {
+  ArrowDown,
+  ArrowUp,
+  Bolt,
+  Cup,
+  DangerCircle,
+  Lightbulb,
+} from '@solar-icons/react-native/Linear';
+import { router, type Href } from 'expo-router';
+import { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
@@ -51,6 +51,38 @@ export default function InsightsScreen() {
       <View style={[styles.container, styles.emptyWrap]}>
         <Text style={styles.title}>RIDE INSIGHTS</Text>
         <Text style={styles.subtitle}>No ride captured yet.</Text>
+        <Pressable
+          style={[styles.dashboardButton, { marginTop: spacing.xl }]}
+          onPress={handleGoHome}
+        >
+          <Text style={styles.dashboardText}>GO TO HOMEPAGE</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // Rides shorter than 100m don't have enough samples to compute
+  // meaningful drafting / energy / segment data — show a friendly empty
+  // state instead of confidently claiming "Drafting 100% · 30% saved" on
+  // a ride where the user barely moved.
+  if (lastFinished.distanceMeters < 100) {
+    return (
+      <View style={[styles.container, styles.emptyWrap]}>
+        <Text style={styles.title}>RIDE INSIGHTS</Text>
+        <Text style={styles.subtitle}>
+          This ride was too short to analyze. Try a longer route to unlock
+          drafting and energy stats.
+        </Text>
+        <View style={[styles.coreStatsGrid, { marginTop: spacing.xl }]}>
+          <CoreStat
+            label="Distance"
+            value={formatDistanceMeters(lastFinished.distanceMeters)}
+          />
+          <CoreStat
+            label="Total time"
+            value={formatHourMin(lastFinished.durationSec)}
+          />
+        </View>
         <Pressable
           style={[styles.dashboardButton, { marginTop: spacing.xl }]}
           onPress={handleGoHome}
@@ -597,8 +629,10 @@ const styles = StyleSheet.create({
   dashboardButton: {
     backgroundColor: colors.surfaceElevated,
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
     borderRadius: radius.pill,
     alignItems: 'center',
+    alignSelf: 'stretch',
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
   },

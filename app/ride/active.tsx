@@ -1,16 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pause, Play, Stop, MapArrowRight } from '@solar-icons/react-native/Linear';
-import Svg, { Circle } from 'react-native-svg';
-import { colors, radius, spacing, typography } from '@/theme';
 import {
-  formatDistanceMeters,
-  formatHourMin,
-  formatMmSs,
-  useRide,
+    formatDistanceMeters,
+    formatHourMin,
+    formatMmSs,
+    useRide,
 } from '@/lib/ride';
+import { toast } from '@/lib/toast';
+import { colors, radius, spacing, typography } from '@/theme';
+import { MapArrowRight, Pause, Play, Stop } from '@solar-icons/react-native/Linear';
+import { Href, router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
+
+/** Duration (ms) the user has to keep holding before the ride finishes. */
+const HOLD_DURATION_MS = 1200;
 
 const GAUGE_SIZE = 280;
 const GAUGE_STROKE = 6;
@@ -76,6 +80,10 @@ export default function ActiveRideScreen() {
 
   const [holding, setHolding] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 0 → 1 across HOLD_DURATION_MS while the user is pressing.
+  // Drives a left-to-right yellow fill behind the button label.
+  const holdProgress = useRef(new Animated.Value(0)).current;
+  const fillAnimation = useRef<Animated.CompositeAnimation | null>(null);
 
   // Safety net: if the user landed here without a started ride (e.g. on
   // refresh during dev), kick off an empty one so they don't get stuck on
@@ -88,21 +96,61 @@ export default function ActiveRideScreen() {
 
   const handleHoldIn = () => {
     setHolding(true);
+    fillAnimation.current?.stop();
+    holdProgress.setValue(0);
+    fillAnimation.current = Animated.timing(holdProgress, {
+      toValue: 1,
+      duration: HOLD_DURATION_MS,
+      // Animating width % needs the JS driver; native driver only
+      // supports transform + opacity.
+      useNativeDriver: false,
+    });
+    fillAnimation.current.start();
     holdTimer.current = setTimeout(() => {
       finishRide();
+      toast.success('Ride finished', { text2: 'Stats are saved.' });
       router.push('/ride/complete' as Href);
-    }, 1200);
+    }, HOLD_DURATION_MS);
   };
 
   const handleHoldOut = () => {
     setHolding(false);
+    fillAnimation.current?.stop();
+    // Spring back to empty so a re-press starts from the start, not
+    // from wherever the user released.
+    Animated.timing(holdProgress, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
     }
   };
 
+  // Width-percent string the fill View animates between. We render the
+  // fill as an absolutely-positioned bar inside the button so it appears
+  // to sweep left → right beneath the icon and label.
+  const finishFillWidth = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
   const paused = phase === 'paused';
+
+  // Wrap pause / resume so they emit a toast — the modal sheet
+  // makes the state change obvious on pause, but resume slides
+  // away with no other signal.
+  const handlePause = useCallback(() => {
+    pauseRide();
+    toast.info('Ride paused');
+  }, [pauseRide]);
+
+  const handleResume = useCallback(() => {
+    resumeRide();
+    toast.success('Ride resumed');
+  }, [resumeRide]);
 
   // ── Display helpers ──────────────────────────────────────────────────
   const speedText = liveStats.speedKmh.toFixed(1);
@@ -178,7 +226,9 @@ export default function ActiveRideScreen() {
       <View style={styles.footer}>
         <Pressable
           style={styles.pauseButton}
-          onPress={paused ? resumeRide : pauseRide}
+          accessibilityRole="button"
+          accessibilityLabel={paused ? 'Resume ride' : 'Pause ride'}
+          onPress={paused ? handleResume : handlePause}
         >
           {paused ? (
             <Play size={22} color={colors.textOnDark} />
@@ -187,16 +237,28 @@ export default function ActiveRideScreen() {
           )}
         </Pressable>
         <Pressable
-          style={[styles.finishButton, holding && styles.finishButtonActive]}
           onPressIn={handleHoldIn}
           onPressOut={handleHoldOut}
+          accessibilityRole="button"
+          accessibilityLabel="Hold to finish ride"
+          style={styles.finishButtonWrapper}
         >
-          <Stop size={20} color={holding ? colors.textOnPrimary : colors.textOnDark} />
-          <Text
-            style={[styles.finishText, holding && styles.finishTextActive]}
-          >
-            HOLD TO FINISH
-          </Text>
+          {/* Background fill — grows left → right while the user holds. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.finishFill, { width: finishFillWidth }]}
+          />
+          <View style={styles.finishContent}>
+            <Stop
+              size={20}
+              color={holding ? colors.textOnPrimary : colors.textOnDark}
+            />
+            <Text
+              style={[styles.finishText, holding && styles.finishTextActive]}
+            >
+              HOLD TO FINISH
+            </Text>
+          </View>
         </Pressable>
       </View>
 
@@ -444,18 +506,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  finishButton: {
+  // Three stacked layers:
+  //   1. wrapper   — grey base + clips the fill to the pill shape
+  //   2. finishFill — absolutely-positioned yellow bar that sweeps L→R
+  //   3. content    — icon + text laid out on top
+  finishButtonWrapper: {
     flex: 1,
     height: 60,
     borderRadius: radius.xl,
+    overflow: 'hidden',
     backgroundColor: colors.surfaceElevated,
+    justifyContent: 'center',
+  },
+  finishFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: colors.primary,
+  },
+  finishContent: {
+    flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  finishButtonActive: {
-    backgroundColor: colors.primary,
   },
   finishText: {
     color: colors.textOnDark,
@@ -482,8 +557,6 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
     padding: spacing.lg,
     borderRadius: radius['2xl'],
-    borderWidth: 1,
-    borderColor: colors.primary,
     alignItems: 'stretch',
     gap: spacing.sm,
   },

@@ -1,48 +1,47 @@
-import { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { UsersGroupTwoRounded } from '@solar-icons/react-native/Linear';
+import { ElevatedCard } from '@/components/ui/draft';
 import { colors, radius, spacing, typography } from '@/theme';
-import { getCompatibility, useRide } from '@/lib/ride';
-import {
-  HighlightCard,
-  ListItemCard,
-  PrimaryButton,
-  PrimaryCard,
-} from '@/components/ui/draft';
+import { Href, router } from 'expo-router';
+import { ChevronRight, Users } from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const TAB_BAR_SAFE_AREA = 110;
 
 type TrainType = 'ROTATING' | 'STEADY' | 'TEMPO';
+
+type LiveTrain = {
+  id: string;
+  name: string;
+  riders: number;
+  paceKmh: number;
+  trainType: TrainType;
+  /** Rough cardinal heading the train is rolling. */
+  heading: string;
+};
 
 type Group = {
   id: string;
   name: string;
   riders: number;
   paceKmh: number;
-  tier: 'ELITE' | 'PRO' | 'OPEN';
-  live: boolean;
   trainType: TrainType;
 };
 
-const ACTIVE_TRAINS: Group[] = [
+const LIVE_TRAINS: LiveTrain[] = [
   {
     id: 'morning-express',
     name: 'MORNING EXPRESS',
     riders: 12,
     paceKmh: 34,
-    tier: 'ELITE',
-    live: true,
     trainType: 'ROTATING',
+    heading: 'NW · 4.2 km away',
   },
   {
     id: 'coastal-cruise',
     name: 'COASTAL CRUISE',
     riders: 8,
     paceKmh: 28,
-    tier: 'PRO',
-    live: true,
     trainType: 'STEADY',
+    heading: 'S · 1.8 km away',
   },
 ];
 
@@ -52,9 +51,14 @@ const SUGGESTED_GROUPS: Group[] = [
     name: 'WEEKEND WARRIORS',
     riders: 45,
     paceKmh: 30,
-    tier: 'PRO',
-    live: false,
     trainType: 'TEMPO',
+  },
+  {
+    id: 'dawn-patrol',
+    name: 'DAWN PATROL',
+    riders: 22,
+    paceKmh: 32,
+    trainType: 'ROTATING',
   },
 ];
 
@@ -64,30 +68,44 @@ function trainTypeLabel(type: TrainType): string {
   return 'Tempo';
 }
 
-function TrainStats({ group }: { group: Group }) {
+function GroupStatsRow({
+  paceKmh,
+  riders,
+  trainType,
+}: {
+  paceKmh: number;
+  riders: number;
+  trainType: TrainType;
+}) {
   return (
     <View style={styles.statsRow}>
       <View style={styles.statBlock}>
-        <Text style={styles.statLabel}>Pace</Text>
-        <Text style={styles.statValue}>{group.paceKmh} km/h</Text>
+        <Text style={styles.statLabel}>PACE</Text>
+        <Text style={styles.statValue}>{paceKmh} km/h</Text>
       </View>
       <View style={styles.statBlock}>
-        <Text style={styles.statLabel}>Riders</Text>
-        <Text style={styles.statValue}>{group.riders}</Text>
+        <Text style={styles.statLabel}>RIDERS</Text>
+        <Text style={styles.statValue}>{riders}</Text>
       </View>
       <View style={styles.statBlock}>
-        <Text style={styles.statLabel}>Type</Text>
-        <Text style={styles.statValue}>{trainTypeLabel(group.trainType)}</Text>
+        <Text style={styles.statLabel}>TYPE</Text>
+        <Text style={styles.statValue}>{trainTypeLabel(trainType)}</Text>
       </View>
     </View>
   );
 }
 
+/**
+ * Groups screen — restructured to:
+ *   1. LIVE TRAINS — highlighted as cards (the only "special" content)
+ *   2. SUGGESTED GROUPS — divider-separated list rows, no card chrome
+ *
+ * The previous yellow "Match score" hero card lived here even though
+ * the score is fundamentally a Profile concept. It's been removed —
+ * compatibility now stays on Home / Profile, and Groups focuses on
+ * groups.
+ */
 export default function GroupsScreen() {
-  const { history } = useRide();
-  const compatibility = useMemo(() => getCompatibility(history), [history]);
-  const matchScore = history.length > 0 ? compatibility.score : null;
-
   return (
     <ScrollView
       style={styles.container}
@@ -97,73 +115,83 @@ export default function GroupsScreen() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.header}>GROUPS</Text>
-          <Text style={styles.headerSub}>Who to ride with</Text>
-        </View>
-        <View style={styles.headerBadge}>
-          <UsersGroupTwoRounded size={22} color={colors.textMuted} />
+          <Text style={styles.headerSub}>Your riding community</Text>
         </View>
       </View>
 
+      {/* LIVE TRAINS — cards because the LIVE state is the page's
+          only true "hero" content. */}
       <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>ACTIVE DRAFT TRAINS</Text>
-        <View style={styles.liveBadge}>
+        <Text style={styles.sectionTitle}>LIVE TRAINS</Text>
+        <View style={styles.liveCount}>
           <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Live</Text>
+          <Text style={styles.liveCountText}>{LIVE_TRAINS.length} now</Text>
         </View>
       </View>
 
-      {ACTIVE_TRAINS.map((train) => (
-        <PrimaryCard key={train.id} style={styles.activeCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.trainName}>{train.name}</Text>
-            <View style={styles.tierBadge}>
-              <Text style={styles.tierBadgeText}>{train.tier}</Text>
-            </View>
-          </View>
-          <TrainStats group={train} />
-          <PrimaryButton
-            style={styles.joinButton}
+      {LIVE_TRAINS.length === 0 ? (
+        <ElevatedCard style={styles.emptyTrainCard}>
+          <Text style={styles.emptyTrainTitle}>No trains rolling right now</Text>
+          <Text style={styles.emptyTrainBody}>
+            Start a ride to broadcast your route — others nearby can hop on.
+          </Text>
+        </ElevatedCard>
+      ) : (
+        LIVE_TRAINS.map((train) => (
+          <ElevatedCard
+            key={train.id}
+            style={styles.trainCard}
             onPress={() => router.push('/ride/route-details' as Href)}
           >
-            Join train
-          </PrimaryButton>
-        </PrimaryCard>
-      ))}
+            <View style={styles.trainCardHeader}>
+              <View style={styles.trainBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.trainBadgeText}>LIVE</Text>
+              </View>
+              <Text style={styles.trainHeading}>{train.heading}</Text>
+            </View>
+            <Text style={styles.trainName}>{train.name}</Text>
+            <GroupStatsRow
+              paceKmh={train.paceKmh}
+              riders={train.riders}
+              trainType={train.trainType}
+            />
+          </ElevatedCard>
+        ))
+      )}
 
+      {/* SUGGESTED GROUPS — divider list, no cards. The section header
+          + hairline between rows is enough hierarchy. */}
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>
         SUGGESTED FOR YOU
       </Text>
+      <Text style={styles.sectionHint}>Based on your pace and history</Text>
 
-      <HighlightCard style={styles.matchCard}>
-        <Text style={styles.matchTitle}>Match score</Text>
-        <Text style={styles.matchScoreLarge}>
-          {matchScore !== null ? `${matchScore}%` : '—'}
-        </Text>
-        <Text style={styles.matchContext}>
-          Based on pace, cadence, and drafting history
-        </Text>
-        {history.length > 0 && (
-          <Text style={styles.matchDetail}>
-            {compatibility.styleLabel} · {compatibility.explanation.split('.')[0]}
-          </Text>
-        )}
-      </HighlightCard>
-
-      {SUGGESTED_GROUPS.map((group) => (
-        <ListItemCard
-          key={group.id}
-          style={styles.suggestedCard}
-          onPress={() => router.push('/ride/route-details' as Href)}
-          leading={
-            <View style={styles.suggestedIcon}>
-              <UsersGroupTwoRounded size={22} color={colors.textMuted} />
+      <View style={styles.groupList}>
+        {SUGGESTED_GROUPS.map((group) => (
+          <Pressable
+            key={group.id}
+            accessibilityRole="button"
+            onPress={() => router.push('/ride/route-details' as Href)}
+            style={({ pressed }) => [
+              styles.groupRow,
+              pressed && styles.groupRowPressed,
+            ]}
+          >
+            <View style={styles.groupIcon}>
+              <Users size={20} color={colors.textOnDark} />
             </View>
-          }
-        >
-          <Text style={styles.suggestedName}>{group.name}</Text>
-          <TrainStats group={group} />
-        </ListItemCard>
-      ))}
+            <View style={styles.groupBody}>
+              <Text style={styles.groupName}>{group.name}</Text>
+              <Text style={styles.groupMeta}>
+                {group.riders} riders · {group.paceKmh} km/h ·{' '}
+                {trainTypeLabel(group.trainType)}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </Pressable>
+        ))}
+      </View>
     </ScrollView>
   );
 }
@@ -182,7 +210,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   header: {
     color: colors.textOnDark,
@@ -197,16 +225,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     marginTop: spacing['3xs'],
   },
-  headerBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
   sectionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -220,13 +238,21 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wider,
   },
   sectionTitleSpaced: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.sm,
+    marginTop: spacing['2xl'],
+    marginBottom: spacing['2xs'],
   },
-  liveBadge: {
+  sectionHint: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    marginBottom: spacing.sm,
+    opacity: 0.7,
+  },
+  // Status pill — dot + label, no outline (matches Home riders list).
+  liveCount: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing['2xs'],
+    gap: spacing.xs,
   },
   liveDot: {
     width: 6,
@@ -234,46 +260,65 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: '#3FBF6E',
   },
-  liveText: {
-    color: colors.textOnDark,
+  liveCountText: {
+    color: '#3FBF6E',
     fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size.xs,
+    fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
+    textTransform: 'uppercase',
   },
-  activeCard: {
-    marginBottom: spacing.md,
+  trainCard: {
+    marginBottom: spacing.sm,
   },
-  cardHeader: {
+  trainCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  trainName: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.lg,
-    flex: 1,
+  trainBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing['2xs'],
   },
-  tierBadge: {
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing['2xs'],
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  tierBadgeText: {
-    color: colors.textMuted,
+  trainBadgeText: {
+    color: '#3FBF6E',
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
   },
+  trainHeading: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
+    textTransform: 'uppercase',
+  },
+  trainName: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size.base,
+    marginBottom: spacing.sm,
+  },
+  emptyTrainCard: {
+    marginBottom: spacing.sm,
+  },
+  emptyTrainTitle: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.sm,
+    marginBottom: spacing['2xs'],
+  },
+  emptyTrainBody: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    lineHeight: typography.size.xs * typography.lineHeight.normal,
+  },
   statsRow: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.md,
   },
   statBlock: {
     flex: 1,
@@ -291,57 +336,43 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.sm,
   },
-  joinButton: {
-    minHeight: 48,
+  // Suggested groups — flat divider list. Each row is just the icon +
+  // text + chevron with a hairline rule between them.
+  groupList: {
+    // No background or border-radius; rows draw their own dividers.
   },
-  matchCard: {
-    marginBottom: spacing.md,
+  groupRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.inactiveOnDark,
   },
-  matchTitle: {
-    color: colors.textOnPrimary,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wider,
-    textTransform: 'uppercase',
+  groupRowPressed: {
     opacity: 0.85,
-    marginBottom: spacing['2xs'],
   },
-  matchScoreLarge: {
-    color: colors.textOnPrimary,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size['3xl'],
-    marginBottom: spacing.xs,
-  },
-  matchContext: {
-    color: colors.textOnPrimary,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.xs,
-    opacity: 0.9,
-    marginBottom: spacing['2xs'],
-  },
-  matchDetail: {
-    color: colors.textOnPrimary,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size['2xs'],
-    opacity: 0.85,
-    lineHeight: typography.size['2xs'] * typography.lineHeight.normal,
-  },
-  suggestedCard: {
-    marginBottom: spacing.sm,
-  },
-  suggestedIcon: {
-    width: 44,
-    height: 44,
+  groupIcon: {
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestedName: {
+  groupBody: {
+    flex: 1,
+  },
+  groupName: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
     fontSize: typography.size.sm,
-    marginBottom: spacing.xs,
+    marginBottom: spacing['3xs'],
+  },
+  groupMeta: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
   },
 });

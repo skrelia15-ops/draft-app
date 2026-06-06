@@ -1,27 +1,26 @@
-import { useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUserLocation } from '@/hooks/useUserLocation';
+import {
+    clusterNearbyRiders,
+    getCompatibility,
+    getCurrentConditions,
+    getNearbyRiders,
+    useRide,
+    type DraftPotential,
+    type RiderCluster,
+} from '@/lib/ride';
+import { buildGoalDays, GoalsCard } from '@/components/ui/draft';
+import { useProfile } from '@/lib/profile';
+import { colors, radius, spacing, typography } from '@/theme';
 import { Bolt } from '@solar-icons/react-native/Bold';
 import {
-  ArrowRight,
-  Compass,
-  Wind,
-  InfoCircle,
-  MapArrowRight,
+    ArrowRight,
+    MapArrowRight,
+    Wind,
 } from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
-import {
-  clusterNearbyRiders,
-  getCompatibility,
-  getCurrentConditions,
-  getNearbyRiders,
-  useRide,
-  type RiderCluster,
-  type NearbyRider,
-  type DraftPotential,
-} from '@/lib/ride';
-import { useUserLocation } from '@/hooks/useUserLocation';
+import { Href, router } from 'expo-router';
+import { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TAB_BAR_SAFE_AREA = 110;
 
@@ -29,6 +28,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { history } = useRide();
   const { coords } = useUserLocation();
+  const { profile } = useProfile();
 
   const conditions = useMemo(() => getCurrentConditions(), []);
   const riders = useMemo(() => getNearbyRiders(coords), [coords]);
@@ -49,7 +49,13 @@ export default function HomeScreen() {
       ? `${(weeklyWatts / 1000).toFixed(1)}k Wh`
       : `${Math.round(weeklyWatts)} Wh`;
 
-  const streakDays = useMemo(() => computeStreak(history.map((r) => r.endedAt)), [history]);
+  // Build the data the new Figma-port Goals card expects: a 7-element
+  // Mon→Sun boolean array of "did the rider log a ride that day" plus
+  // today's weekday index (also Mon-first).
+  const { weekRideDays, ridesThisWeek, todayWeekdayIdx } = useMemo(
+    () => buildWeekProgress(history.map((r) => r.endedAt)),
+    [history],
+  );
 
   const estimatedSave = Math.round(
     260 * (0.18 + (conditions.draftIndex / 100) * 0.16),
@@ -114,7 +120,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.heroAdvice}>
-          <Wind size={14} color={colors.primary} />
+          <Wind size={14} color={colors.textOnPrimary} />
           <Text style={styles.heroAdviceText}>{conditions.draftAdvice}</Text>
         </View>
 
@@ -123,13 +129,26 @@ export default function HomeScreen() {
           onPress={() => router.push('/ride/map' as Href)}
         >
           <Text style={styles.primaryButtonText}>PLAN A RIDE</Text>
-          <ArrowRight size={20} color={colors.textOnPrimary} />
+          <ArrowRight size={20} color={colors.textOnDark} />
         </Pressable>
+      </View>
+
+      {/* GoalsCard lives directly below the hero — matches the Figma
+          Home layout where the weekly-progress card is the SECOND card
+          on the screen, not buried at the bottom. */}
+      <View style={styles.goalsWrap}>
+        <GoalsCard
+          title="Your weekly goals"
+          subtitle="Last 7 days"
+          achievedLabel={`${ridesThisWeek}/${profile.weeklyRideGoal}`}
+          days={buildGoalDays(weekRideDays, todayWeekdayIdx)}
+          onPress={() => router.push('/goals' as Href)}
+        />
       </View>
 
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>RIDERS NEARBY</Text>
-        <Pressable onPress={() => router.push('/explore' as Href)}>
+        <Pressable onPress={() => router.push('/ride/map' as Href)}>
           <Text style={styles.sectionLink}>VIEW MAP</Text>
         </Pressable>
       </View>
@@ -141,33 +160,24 @@ export default function HomeScreen() {
           </Text>
         </View>
       ) : (
-        <>
-          {clusters.slice(0, 3).map((cluster) => (
-            <RiderClusterRow
-              key={cluster.id}
-              cluster={cluster}
-              onPress={() => router.push('/ride/map' as Href)}
-            />
-          ))}
-          {riders.slice(0, 2).map((rider) => (
-            <NearbyRiderRow
-              key={rider.id}
-              rider={rider}
-              onPress={() => router.push('/ride/map' as Href)}
-            />
-          ))}
-        </>
+        // Top 3 clusters keeps the list short — anything more reads as
+        // padding, and the user can tap "VIEW MAP" to see everybody.
+        clusters.slice(0, 3).map((cluster) => (
+          <RiderClusterRow
+            key={cluster.id}
+            cluster={cluster}
+            onPress={() => router.push('/ride/map' as Href)}
+          />
+        ))
       )}
 
       <View style={[styles.sectionRow, styles.sectionRowSpaced]}>
         <Text style={styles.sectionTitle}>RIDING STYLE MATCH</Text>
-        <Text style={styles.sectionMutedLabel}>{compatibility.tier}</Text>
       </View>
 
-      <Pressable
-        style={styles.compatCard}
-        onPress={() => router.push('/profile' as Href)}
-      >
+      {/* Static overview — does not navigate anywhere. The score is
+          read-only context here; Profile is reached via the tab bar. */}
+      <View style={styles.compatCard}>
         <View style={styles.compatHeader}>
           <View style={styles.compatScoreBlock}>
             <Text style={styles.compatScore}>{compatibility.score}</Text>
@@ -175,32 +185,17 @@ export default function HomeScreen() {
           </View>
           <View style={styles.compatBody}>
             <Text style={styles.compatTitle}>{compatibility.styleLabel}</Text>
-            <View style={styles.compatExplainRow}>
-              <InfoCircle size={14} color={colors.textMuted} />
-              <Text style={styles.compatExplain} numberOfLines={2}>
-                {compatibility.nearbyMatchPercent}% match with nearby riders ·{' '}
-                {compatibility.matchingRidersNearby} style match
-              </Text>
-            </View>
+            <Text style={styles.compatExplain} numberOfLines={2}>
+              {compatibility.tier === 'BUILDING'
+                ? 'Log rides to unlock your score and nearby matches.'
+                : `${compatibility.nearbyMatchPercent}% match with nearby riders · ${compatibility.matchingRidersNearby} style match`}
+            </Text>
           </View>
         </View>
         <View style={styles.compatBreakdown}>
           <CompatBar label="PACE" value={compatibility.paceMatch} />
           <CompatBar label="CADENCE" value={compatibility.cadenceMatch} />
           <CompatBar label="BEHAVIOUR" value={compatibility.behaviorMatch} />
-        </View>
-      </Pressable>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>STREAK</Text>
-          <Text style={styles.statValue}>
-            {streakDays} {streakDays === 1 ? 'Day' : 'Days'}
-          </Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>RIDES</Text>
-          <Text style={styles.statValue}>{history.length}</Text>
         </View>
       </View>
     </ScrollView>
@@ -217,8 +212,8 @@ function RiderClusterRow({
   const tone = potentialColor(cluster.potential);
   return (
     <Pressable style={styles.clusterRow} onPress={onPress}>
-      <View style={[styles.clusterIcon, { borderColor: tone }]}>
-        <MapArrowRight size={22} color={tone} />
+      <View style={styles.clusterIcon}>
+        <MapArrowRight size={22} color={colors.textOnDark} />
       </View>
       <View style={styles.riderBody}>
         <View style={styles.riderTopRow}>
@@ -230,38 +225,10 @@ function RiderClusterRow({
           {cluster.riderCount === 1 ? 'rider' : 'riders'} to join
         </Text>
       </View>
-      <View style={[styles.potentialBadge, { borderColor: tone }]}>
+      <View style={styles.potentialBadge}>
+        <View style={[styles.potentialDot, { backgroundColor: tone }]} />
         <Text style={[styles.potentialText, { color: tone }]}>
           {cluster.potential}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function NearbyRiderRow({
-  rider,
-  onPress,
-}: {
-  rider: NearbyRider;
-  onPress: () => void;
-}) {
-  const tone = potentialColor(rider.potential);
-  return (
-    <Pressable style={styles.riderRow} onPress={onPress}>
-      <View style={styles.riderIcon}>
-        <Compass size={22} color={tone} />
-      </View>
-      <View style={styles.riderBody}>
-        <View style={styles.riderTopRow}>
-          <Text style={styles.riderName}>{rider.name}</Text>
-          <Text style={styles.riderPace}>{rider.paceKmh.toFixed(1)} km/h</Text>
-        </View>
-        <Text style={styles.riderHint}>{rider.hint}</Text>
-      </View>
-      <View style={[styles.potentialBadge, { borderColor: tone }]}>
-        <Text style={[styles.potentialText, { color: tone }]}>
-          {rider.potential}
         </Text>
       </View>
     </Pressable>
@@ -280,35 +247,59 @@ function CompatBar({ label, value }: { label: string; value: number }) {
   );
 }
 
+/**
+ * Status tone for a nearby rider's draft potential. Three discrete
+ * hues — green (great match), amber (decent), muted (weak) — same
+ * vocabulary used by the LIVE badge on Groups so users learn one
+ * colour system instead of two.
+ */
 function potentialColor(p: DraftPotential): string {
-  if (p === 'HIGH') return colors.primary;
-  if (p === 'MEDIUM') return colors.textOnDark;
+  if (p === 'HIGH') return '#3FBF6E';
+  if (p === 'MEDIUM') return '#F2A93B';
   return colors.textMuted;
 }
 
-function computeStreak(timestamps: number[]): number {
-  if (timestamps.length === 0) return 0;
-  // Count consecutive days back from today that have at least one ride.
-  const days = new Set<string>();
+/**
+ * Roll up ride timestamps into the data the GoalsCard needs:
+ *
+ *   weekRideDays    Mon→Sun booleans for the current ISO week
+ *   rideDaysThisWeek number of true values in weekRideDays
+ *   todayWeekdayIdx  0–6 index of today (Mon = 0)
+ */
+function buildWeekProgress(timestamps: number[]): {
+  /** Did at least one ride happen on each weekday this week? */
+  weekRideDays: boolean[];
+  /** Total rides this week (multiple per day count separately). */
+  ridesThisWeek: number;
+  todayWeekdayIdx: number;
+} {
+  const now = new Date();
+  // Convert Sunday=0 → Sunday=6, Monday=0 (ISO-ish week).
+  const todayWeekdayIdx = (now.getDay() + 6) % 7;
+
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - todayWeekdayIdx);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Count total rides per weekday; the booleans are derived from these.
+  // We split the two metrics because the bar visualisation cares about
+  // "any ride happened" while the headline number is the goal-aware
+  // total rides count.
+  const ridesByDay = Array<number>(7).fill(0);
   for (const t of timestamps) {
     const d = new Date(t);
-    days.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-  }
-  let streak = 0;
-  const cursor = new Date();
-  for (let i = 0; i < 60; i++) {
-    const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
-    if (days.has(key)) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    } else if (i === 0) {
-      // No ride today is fine; check yesterday before breaking.
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
+    const dayStart = new Date(d);
+    dayStart.setHours(0, 0, 0, 0);
+    const diffDays = Math.round(
+      (dayStart.getTime() - startOfWeek.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    if (diffDays >= 0 && diffDays < 7) {
+      ridesByDay[diffDays] += 1;
     }
   }
-  return streak;
+  const weekRideDays = ridesByDay.map((n) => n > 0);
+  const ridesThisWeek = ridesByDay.reduce((a, b) => a + b, 0);
+  return { weekRideDays, ridesThisWeek, todayWeekdayIdx };
 }
 
 const styles = StyleSheet.create({
@@ -355,14 +346,16 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wide,
   },
   weeklyValue: {
-    color: colors.primary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontStyle: 'italic',
     fontSize: typography.size.base,
     marginTop: spacing['3xs'],
   },
+  // Hero card — the SINGLE yellow surface on Home (matches reference
+  // design: one bold yellow card, everything else dark + muted).
   heroCard: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.primary,
     borderRadius: radius['2xl'],
     padding: spacing.lg,
     marginBottom: spacing.xl,
@@ -374,7 +367,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   conditionPill: {
-    backgroundColor: colors.primary,
+    backgroundColor: 'rgba(17,17,17,0.12)',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radius.pill,
@@ -389,19 +382,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   draftIndexValue: {
-    color: colors.primary,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.extrabold,
     fontStyle: 'italic',
     fontSize: typography.size.xl,
   },
   draftIndexLabel: {
-    color: colors.textMuted,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
+    opacity: 0.7,
   },
   rideNow: {
-    color: colors.textOnDark,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.extrabold,
     fontStyle: 'italic',
     fontSize: typography.size['2xl'],
@@ -416,19 +410,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   heroStatLabel: {
-    color: colors.textMuted,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
     marginBottom: spacing['2xs'],
+    opacity: 0.7,
   },
   heroStatValue: {
-    color: colors.textOnDark,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size.base,
   },
   heroStatAccent: {
-    color: colors.primary,
+    // No longer needed visually — kept for backward compat with the
+    // existing JSX (EST. SAVE used to highlight in yellow on a dark
+    // surface; on a yellow surface we just keep the same dark text).
+    fontFamily: typography.fontFamily.extrabold,
   },
   heroAdvice: {
     flexDirection: 'row',
@@ -439,22 +437,25 @@ const styles = StyleSheet.create({
   },
   heroAdviceText: {
     flex: 1,
-    color: colors.textMuted,
+    color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
+    opacity: 0.8,
   },
+  // PLAN A RIDE — dark button on yellow surface (reverses the usual
+  // pattern). Reads as the strongest CTA on the screen.
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.background,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
   },
   primaryButtonText: {
-    color: colors.textOnPrimary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
     fontSize: typography.size.base,
     letterSpacing: typography.letterSpacing.wide,
@@ -475,16 +476,17 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wider,
   },
   sectionMutedLabel: {
-    color: colors.primary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
   },
   sectionLink: {
-    color: colors.primary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
+    textDecorationLine: 'underline',
   },
   emptyCard: {
     backgroundColor: colors.surfaceElevated,
@@ -498,40 +500,20 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     textAlign: 'center',
   },
-  riderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
+  // Riders Nearby rows — flat list, hairline divider between rows.
+  // No card chrome (the section header is enough hierarchy) so the
+  // whole page doesn't read as nested bento.
   clusterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.inactiveOnDark,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.inactiveOnDark,
   },
   clusterIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riderIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.background,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -550,7 +532,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
   },
   riderPace: {
-    color: colors.primary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
   },
@@ -560,11 +542,19 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
   },
+  // Status pill — coloured dot + coloured label, no outline. Matches
+  // the "LIVE" treatment on Groups for a consistent status vocabulary.
   potentialBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing['2xs'],
-    borderRadius: radius.pill,
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing['2xs'],
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing['3xs'],
+  },
+  potentialDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 999,
   },
   potentialText: {
     fontFamily: typography.fontFamily.bold,
@@ -587,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   compatScore: {
-    color: colors.primary,
+    color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
     fontStyle: 'italic',
     fontSize: typography.size['2xl'],
@@ -644,7 +634,7 @@ const styles = StyleSheet.create({
   },
   compatBarFill: {
     height: '100%',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.textOnDark,
   },
   compatBarValue: {
     width: 24,
@@ -653,28 +643,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size['2xs'],
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xl,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-    marginBottom: spacing.xs,
-  },
-  statValue: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.lg,
+  goalsWrap: {
+    marginBottom: spacing.xl,
   },
 });

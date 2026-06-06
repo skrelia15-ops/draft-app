@@ -35,13 +35,17 @@ export function formatMmSs(totalSeconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** "1H 24M" / "24M" — for ride duration shown in summaries. */
+/**
+ * "1H 24MIN" / "24MIN" — for ride duration shown in summaries.
+ * We use "MIN" (not "M") so it can't be confused with the meters suffix
+ * used by `formatDistanceMeters`.
+ */
 export function formatHourMin(totalSeconds: number): string {
   const secs = Math.max(0, Math.round(totalSeconds));
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
-  if (h <= 0) return `${m}M`;
-  return `${h}H ${m}M`;
+  if (h <= 0) return `${m} MIN`;
+  return `${h}H ${m} MIN`;
 }
 
 /** "24.5 KM" or "320 M". */

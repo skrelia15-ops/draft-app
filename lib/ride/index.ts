@@ -1,4 +1,5 @@
 export { RideProvider, useRide } from './RideProvider';
+export { clearHistory } from './storage';
 export {
   computeInsights,
   buildSegments,

@@ -1,19 +1,169 @@
-import { useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
-import { ArrowLeft } from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
 import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
+import { useProfile, type BikeType, type SkillLevel } from '@/lib/profile';
+import { toast } from '@/lib/toast';
+import { colors, radius, spacing, typography } from '@/theme';
+import { ArrowLeft, Bicycling, Camera } from '@solar-icons/react-native/Linear';
+import * as ImagePicker from 'expo-image-picker';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+    Alert,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 
-const skillLevels = ['Novice', 'Pro', 'Elite'];
+const SKILL_LEVELS: readonly SkillLevel[] = ['Novice', 'Pro', 'Elite'];
+const BIKE_TYPES: readonly BikeType[] = ['Road', 'Gravel', 'MTB', 'Hybrid'];
 
+// Validation bounds — silently clamp on save and surface a toast if the
+// user typed something out of range.
+const PACE_MIN = 5;
+const PACE_MAX = 60;
+const BIKE_WEIGHT_MIN = 3;
+const BIKE_WEIGHT_MAX = 20;
+
+/**
+ * Profile setup screen — reused for both first-time onboarding and
+ * editing an existing profile from the Profile tab.
+ *
+ * Pass `?mode=edit` when linking from a settings flow to swap the CTA
+ * label to "SAVE CHANGES". The default mode is `create` (initial
+ * onboarding).
+ */
 export default function ProfileSetupScreen() {
-  const [name, setName] = useState('Alex Rider');
-  const [skill, setSkill] = useState('Pro');
-  const [pace, setPace] = useState('28');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const isEdit = params.mode === 'edit';
 
-  const handleCreate = () => {
-    router.replace('/(tabs)');
+  const { profile, update } = useProfile();
+
+  const [name, setName] = useState(profile.name);
+  const [skill, setSkill] = useState<SkillLevel>(profile.skillLevel);
+  const [pace, setPace] = useState(String(profile.avgPaceKmh));
+  const [avatarUri, setAvatarUri] = useState<string | null>(
+    profile.avatarUri,
+  );
+  const [bikeName, setBikeName] = useState(profile.bike?.name ?? '');
+  const [bikeType, setBikeType] = useState<BikeType>(
+    profile.bike?.type ?? 'Road',
+  );
+  const [bikeWeight, setBikeWeight] = useState(
+    String(profile.bike?.weightKg ?? 7.2),
+  );
+
+  const trimmedName = name.trim();
+  const nameValid = trimmedName.length > 0;
+  const paceNumber = Number(pace);
+  const paceValid =
+    Number.isFinite(paceNumber) && paceNumber >= PACE_MIN && paceNumber <= PACE_MAX;
+  const weightNumber = Number(bikeWeight);
+  const weightValid =
+    Number.isFinite(weightNumber) &&
+    weightNumber >= BIKE_WEIGHT_MIN &&
+    weightNumber <= BIKE_WEIGHT_MAX;
+  const canSubmit = nameValid && paceValid && weightValid;
+
+  const cta = isEdit ? 'SAVE CHANGES' : 'CREATE PROFILE';
+  const subtitle = isEdit
+    ? 'Tune your profile to keep matches accurate.'
+    : 'Define your profile to match the perfect draft.';
+
+  const initials = useMemo(() => {
+    const parts = trimmedName.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }, [trimmedName]);
+
+  const handleSubmit = async () => {
+    if (!nameValid) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!paceValid) {
+      toast.error('Pace looks off', {
+        text2: `Enter a value between ${PACE_MIN} and ${PACE_MAX} km/h.`,
+      });
+      return;
+    }
+    if (!weightValid) {
+      toast.error('Bike weight looks off', {
+        text2: `Enter a value between ${BIKE_WEIGHT_MIN} and ${BIKE_WEIGHT_MAX} kg.`,
+      });
+      return;
+    }
+
+    await update({
+      name: trimmedName,
+      skillLevel: skill,
+      avgPaceKmh: Math.round(paceNumber),
+      avatarUri,
+      bike: {
+        name: bikeName.trim() || 'My bike',
+        type: bikeType,
+        weightKg: Math.round(weightNumber * 10) / 10,
+      },
+    });
+
+    toast.success(isEdit ? 'Profile saved' : 'Profile created', {
+      text2: isEdit ? 'Your changes are in.' : 'Welcome to the slipstream.',
+    });
+
+    if (isEdit) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
+
+  // Shared picker options — square crop to match the circular avatar.
+  const pickerOptions: ImagePicker.ImagePickerOptions = {
+    mediaTypes: 'images',
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.8,
+  };
+
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      toast.error('Camera access denied', {
+        text2: 'Enable camera access in Settings to take a photo.',
+      });
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync(pickerOptions);
+    if (!result.canceled) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
+
+  const pickFromLibrary = async () => {
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      toast.error('Photo access denied', {
+        text2: 'Enable photo access in Settings to choose a picture.',
+      });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+    if (!result.canceled) {
+      setAvatarUri(result.assets[0].uri);
+    }
+  };
+
+  const handleChooseAvatar = () => {
+    Alert.alert('Change photo', 'Choose a source for your profile picture.', [
+      { text: 'Take Photo', onPress: takePhoto },
+      { text: 'Choose from Library', onPress: pickFromLibrary },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   return (
@@ -31,9 +181,32 @@ export default function ProfileSetupScreen() {
         />
 
         <Text style={styles.title}>RIDER DNA</Text>
-        <Text style={styles.subtitle}>
-          Define your profile to match the perfect draft.
-        </Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
+
+        {/* Avatar — tappable, shows current photo or initials. */}
+        <View style={styles.avatarSection}>
+          <Pressable
+            onPress={handleChooseAvatar}
+            accessibilityRole="button"
+            accessibilityLabel="Change profile photo"
+            style={({ pressed }) => [
+              styles.avatarWrap,
+              pressed && styles.avatarWrapPressed,
+            ]}
+          >
+            <View style={styles.avatarRing}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarInitials}>{initials}</Text>
+              )}
+            </View>
+            <View style={styles.avatarEditBadge}>
+              <Camera size={14} color={colors.textOnPrimary} />
+            </View>
+          </Pressable>
+          <Text style={styles.avatarHint}>Tap to change photo</Text>
+        </View>
 
         <InputField
           label="Full name"
@@ -45,12 +218,14 @@ export default function ProfileSetupScreen() {
 
         <Text style={styles.label}>SKILL LEVEL</Text>
         <View style={styles.chipsRow}>
-          {skillLevels.map((level) => {
+          {SKILL_LEVELS.map((level) => {
             const active = skill === level;
             return (
               <Pressable
                 key={level}
                 onPress={() => setSkill(level)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[styles.chip, active && styles.chipActive]}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
@@ -68,14 +243,71 @@ export default function ProfileSetupScreen() {
           keyboardType="numeric"
           containerStyle={styles.input}
         />
+
+        {/* BIKE SETUP — separated visually so it reads as its own block. */}
+        <View style={styles.sectionDivider} />
+
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionIcon}>
+            <Bicycling size={18} color={colors.textOnDark} />
+          </View>
+          <View>
+            <Text style={styles.sectionTitle}>BIKE SETUP</Text>
+            <Text style={styles.sectionSubtitle}>
+              Used to estimate aero savings
+            </Text>
+          </View>
+        </View>
+
+        <InputField
+          label="Bike name"
+          value={bikeName}
+          onChangeText={setBikeName}
+          placeholder="My bike"
+          containerStyle={styles.input}
+        />
+
+        <Text style={styles.label}>BIKE TYPE</Text>
+        <View style={styles.chipsRow}>
+          {BIKE_TYPES.map((type) => {
+            const active = bikeType === type;
+            return (
+              <Pressable
+                key={type}
+                onPress={() => setBikeType(type)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {type}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <InputField
+          label="Bike weight (kg)"
+          value={bikeWeight}
+          onChangeText={setBikeWeight}
+          keyboardType="decimal-pad"
+          containerStyle={styles.input}
+        />
       </ScrollView>
 
-      <PrimaryButton onPress={handleCreate} style={styles.primaryButton}>
-        CREATE PROFILE
+      <PrimaryButton
+        onPress={handleSubmit}
+        disabled={!canSubmit}
+        style={styles.primaryButton}
+      >
+        {cta}
       </PrimaryButton>
     </View>
   );
 }
+
+const AVATAR_SIZE = 96;
 
 const styles = StyleSheet.create({
   container: {
@@ -108,8 +340,62 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.sm,
     lineHeight: typography.size.sm * typography.lineHeight.normal,
-    marginBottom: spacing['3xl'],
+    marginBottom: spacing['2xl'],
   },
+  // Avatar
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  avatarWrap: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    position: 'relative',
+  },
+  avatarWrapPressed: {
+    opacity: 0.85,
+  },
+  avatarRing: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarInitials: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size['2xl'],
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.background,
+  },
+  avatarHint: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    marginTop: spacing.sm,
+  },
+  // Form
   label: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.semibold,
@@ -124,11 +410,14 @@ const styles = StyleSheet.create({
   },
   chipsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   chip: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '22%',
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
@@ -143,6 +432,40 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.textOnPrimary,
+  },
+  // Bike section
+  sectionDivider: {
+    height: 1,
+    backgroundColor: colors.inactiveOnDark,
+    opacity: 0.4,
+    marginVertical: spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  sectionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitle: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size.base,
+    letterSpacing: typography.letterSpacing.wide,
+  },
+  sectionSubtitle: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    marginTop: spacing['3xs'],
   },
   primaryButton: {
     marginHorizontal: spacing.lg,

@@ -1,150 +1,111 @@
-import { useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useUserLocation } from '@/hooks/useUserLocation';
+import { darkMapStyle, type LatLng } from '@/lib/maps';
+import {
+    buildRoutePreview,
+    getCurrentConditions,
+    useRide,
+} from '@/lib/ride';
+import {
+    findRoute,
+    hashIdSeed,
+    shapeLabel,
+    trafficColor,
+    trafficLabel,
+} from '@/lib/routes';
+import { toast } from '@/lib/toast';
+import { colors, radius, spacing, typography } from '@/theme';
 import { Bolt } from '@solar-icons/react-native/Bold';
 import {
-  ArrowLeft,
-  UsersGroupTwoRounded,
-  InfoCircle,
-  Compass,
+    ArrowLeft,
+    ArrowRight,
+    Compass,
+    InfoCircle,
+    Routing2,
+    UsersGroupTwoRounded,
 } from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
-import { darkMapStyle, type LatLng } from '@/lib/maps';
-import { useUserLocation } from '@/hooks/useUserLocation';
-import {
-  buildRoutePreview,
-  useRide,
-  type RouteShape,
-} from '@/lib/ride';
-
-type RouteOption = {
-  id: string;
-  name: string;
-  distanceKm: number;
-  difficulty: 'EASY' | 'MODERATE' | 'HARD';
-  shape: RouteShape;
-  paceKmh: number;
-  riders: number;
-  draftPercent: number;
-  traffic: 'CLEAR' | 'MODERATE' | 'HEAVY';
-  note?: string;
-};
-
-const OPTIONS: RouteOption[] = [
-  {
-    id: 'coastal',
-    name: 'COASTAL SLIPSTREAM',
-    distanceKm: 24.5,
-    difficulty: 'MODERATE',
-    shape: 'point-to-point',
-    paceKmh: 32,
-    riders: 8,
-    draftPercent: 92,
-    traffic: 'MODERATE',
-    note: 'Best drafting right now',
-  },
-  {
-    id: 'urban',
-    name: 'URBAN DRAFT LOOP',
-    distanceKm: 12.2,
-    difficulty: 'EASY',
-    shape: 'loop',
-    paceKmh: 28,
-    riders: 15,
-    draftPercent: 88,
-    traffic: 'CLEAR',
-  },
-  {
-    id: 'gravel',
-    name: 'GRAVEL TRAIN',
-    distanceKm: 35.0,
-    difficulty: 'HARD',
-    shape: 'out-and-back',
-    paceKmh: 24,
-    riders: 4,
-    draftPercent: 76,
-    traffic: 'HEAVY',
-  },
-];
+import { Href, router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const MANHATTAN: LatLng = { latitude: 40.7484, longitude: -73.9857 };
 
-function hashIdSeed(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-  }
-  return h >>> 0;
-}
-
+/**
+ * Detail view for a single saved/discovered route.
+ *
+ * Receives `id` as a query param from the screen that linked here
+ * (Explore card, Home riders-nearby list, Groups suggestion). If the id
+ * is missing or unknown we fall back to the first route in the catalog
+ * so the screen never renders empty — this only happens via deep links.
+ */
 export default function RouteDetailsScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ id?: string }>();
   const { coords } = useUserLocation();
   const { startRide } = useRide();
-  const [selectedId, setSelectedId] = useState(OPTIONS[0].id);
 
+  const route = useMemo(() => findRoute(params.id), [params.id]);
   const origin = coords ?? MANHATTAN;
+  const conditions = useMemo(() => getCurrentConditions(), []);
 
-  // Precompute previews once per origin — same option always returns the
-  // same shape so the map doesn't shuffle on selection changes.
-  const previews = useMemo(() => {
-    return OPTIONS.map((opt) =>
+  const preview = useMemo(
+    () =>
       buildRoutePreview({
         origin,
-        shape: opt.shape,
-        distanceKm: opt.distanceKm,
-        seed: hashIdSeed(opt.id),
+        shape: route.shape,
+        distanceKm: route.distanceKm,
+        seed: hashIdSeed(route.id),
       }),
-    );
-  }, [origin]);
-
-  const selectedIndex = OPTIONS.findIndex((o) => o.id === selectedId);
-  const selected = OPTIONS[selectedIndex];
-  const selectedPreview = previews[selectedIndex];
+    [origin, route],
+  );
 
   const region = useMemo(() => {
-    if (selectedPreview.coordinates.length === 0) return null;
-    const lats = selectedPreview.coordinates.map((c) => c.latitude);
-    const lngs = selectedPreview.coordinates.map((c) => c.longitude);
+    const lats = preview.coordinates.map((c) => c.latitude);
+    const lngs = preview.coordinates.map((c) => c.longitude);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
-    const latDelta = Math.max(0.005, (maxLat - minLat) * 1.4);
-    const lngDelta = Math.max(0.005, (maxLng - minLng) * 1.4);
     return {
       latitude: (minLat + maxLat) / 2,
       longitude: (minLng + maxLng) / 2,
-      latitudeDelta: latDelta,
-      longitudeDelta: lngDelta,
+      latitudeDelta: Math.max(0.005, (maxLat - minLat) * 1.4),
+      longitudeDelta: Math.max(0.005, (maxLng - minLng) * 1.4),
     };
-  }, [selectedPreview]);
+  }, [preview]);
+
+  const estDurationMin = Math.round((route.distanceKm / route.paceKmh) * 60);
 
   const handleStart = () => {
     startRide({
-      routeName: selected.name,
-      routeCoordinates: selectedPreview.coordinates,
-      routeDistanceMeters: selected.distanceKm * 1000,
-      origin: selectedPreview.origin,
-      destination: selectedPreview.destination,
-      fallbackPaceKmh: selected.paceKmh,
+      routeName: route.name,
+      routeCoordinates: preview.coordinates,
+      routeDistanceMeters: route.distanceKm * 1000,
+      origin: preview.origin,
+      destination: preview.destination,
+      fallbackPaceKmh: route.paceKmh,
     });
+    toast.success('Ride started', { text2: `${route.distanceKm} km route` });
     router.push('/ride/active' as Href);
   };
 
   return (
     <View style={styles.container}>
-      <View
-        style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+      <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <ArrowLeft size={22} color={colors.textOnDark} />
         </Pressable>
-        <View>
-          <Text style={styles.destLabel}>LOOP DESTINATION</Text>
-          <Text style={styles.destName}>Choose your route</Text>
+        <View style={styles.headerText}>
+          <Text style={styles.headerKicker}>{shapeLabel(route.shape).toUpperCase()}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {route.name}
+          </Text>
         </View>
       </View>
 
@@ -154,169 +115,115 @@ export default function RouteDetailsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.mapWrap}>
-          {region && (
-            <MapView
-              provider={PROVIDER_GOOGLE}
-              style={StyleSheet.absoluteFill}
-              customMapStyle={darkMapStyle}
-              region={region}
-              pointerEvents="none"
-              showsUserLocation={false}
-              toolbarEnabled={false}
-              showsCompass={false}
-              showsMyLocationButton={false}
-              showsPointsOfInterest={false}
-              showsBuildings={false}
-            >
-              <Polyline
-                coordinates={selectedPreview.coordinates}
-                strokeColor={colors.background}
-                strokeWidth={10}
-                lineCap="round"
-                lineJoin="round"
-                zIndex={1}
-              />
-              <Polyline
-                coordinates={selectedPreview.coordinates}
-                strokeColor={colors.primary}
-                strokeWidth={6}
-                lineCap="round"
-                lineJoin="round"
-                zIndex={2}
-              />
-              <Marker coordinate={selectedPreview.origin} anchor={{ x: 0.5, y: 0.5 }}>
-                <View style={styles.startPin}>
-                  <View style={styles.startPinInner} />
+          <MapView
+            provider={PROVIDER_GOOGLE}
+            style={StyleSheet.absoluteFill}
+            customMapStyle={darkMapStyle}
+            region={region}
+            pointerEvents="none"
+            showsUserLocation={false}
+            toolbarEnabled={false}
+            showsCompass={false}
+            showsMyLocationButton={false}
+            showsPointsOfInterest={false}
+            showsBuildings={false}
+          >
+            <Polyline
+              coordinates={preview.coordinates}
+              strokeColor={colors.background}
+              strokeWidth={10}
+              lineCap="round"
+              lineJoin="round"
+              zIndex={1}
+            />
+            <Polyline
+              coordinates={preview.coordinates}
+              strokeColor={colors.primary}
+              strokeWidth={6}
+              lineCap="round"
+              lineJoin="round"
+              zIndex={2}
+            />
+            <Marker coordinate={preview.origin} anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={styles.startPin}>
+                <View style={styles.startPinInner} />
+              </View>
+            </Marker>
+            {route.shape !== 'loop' && (
+              <Marker coordinate={preview.destination} anchor={{ x: 0.5, y: 1 }}>
+                <View style={styles.endPin} />
+              </Marker>
+            )}
+            {route.shape === 'loop' && preview.joinPoint && (
+              <Marker
+                coordinate={preview.joinPoint}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={styles.joinPin}>
+                  <Compass size={14} color={colors.textOnPrimary} />
                 </View>
               </Marker>
-              {selected.shape !== 'loop' && (
-                <Marker
-                  coordinate={selectedPreview.destination}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={styles.endPin} />
-                </Marker>
-              )}
-              {selected.shape === 'loop' && selectedPreview.joinPoint && (
-                <Marker
-                  coordinate={selectedPreview.joinPoint}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                >
-                  <View style={styles.joinPin}>
-                    <Compass size={14} color={colors.textOnPrimary} />
-                  </View>
-                </Marker>
-              )}
-            </MapView>
-          )}
-          <View style={styles.mapBadge}>
-            <View style={styles.mapBadgeDot} />
-            <Text style={styles.mapBadgeText}>{shapeLabel(selected.shape)}</Text>
-          </View>
+            )}
+          </MapView>
         </View>
 
-        <View style={styles.routeSummary}>
-          <View>
-            <Text style={styles.summaryLabel}>{shapeLabel(selected.shape)}</Text>
-            <Text style={styles.summaryName}>{selected.name}</Text>
-            <Text style={styles.summaryMeta}>
-              {selected.distanceKm} KM · {selected.paceKmh} KM/H · Traffic:{' '}
-              {trafficLabel(selected.traffic)}
-            </Text>
-          </View>
-          <View style={styles.summaryRight}>
-            <Text style={styles.summaryStat}>{selected.draftPercent}%</Text>
-            <Text style={styles.summaryStatLabel}>DRAFT</Text>
-          </View>
+        {/* Pills row — the only "highlighted" element on the screen.
+            Everything else is text + dividers per the design rule. */}
+        <View style={styles.tagRow}>
+          <Tag
+            icon={<Bolt size={14} color={colors.textOnDark} />}
+            label={`${route.draftPercent}% draft`}
+          />
+          <Tag
+            icon={<UsersGroupTwoRounded size={14} color={colors.textOnDark} />}
+            label={`${route.riders} riders`}
+          />
+          <Tag
+            icon={
+              <View
+                style={[
+                  styles.trafficDot,
+                  { backgroundColor: trafficColor(route.traffic) },
+                ]}
+              />
+            }
+            label={`Traffic ${trafficLabel(route.traffic)}`}
+          />
+          <Tag
+            icon={<Routing2 size={14} color={colors.textOnDark} />}
+            label={route.difficulty.toLowerCase()}
+          />
         </View>
 
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={styles.legendStart} />
-            <Text style={styles.legendLabel}>Start</Text>
+        {/* Headline stats as a divider list — no card chrome. */}
+        <StatRow label="Distance" value={`${route.distanceKm} km`} />
+        <StatRow label="Est. time" value={formatDuration(estDurationMin)} />
+        <StatRow label="Est. pace" value={`${route.paceKmh} km/h`} />
+        <StatRow
+          label="Shape"
+          value={`${shapeLabel(route.shape)} — ${shapeBlurb(route.shape)}`}
+          /* `Shape` is the rebuilt "what to expect": a single inline row
+             that combines the shape label and a one-line description.
+             Replaces the previous WHAT TO EXPECT card that took up
+             huge area for the same content. */
+          multilineValue
+        />
+        <StatRow
+          label="Wind"
+          value={`${conditions.windKmh} km/h · ${conditions.windFrom}`}
+        />
+        <StatRow
+          label="Draft index"
+          value={`${conditions.draftIndex}%`}
+          hint={conditions.draftAdvice}
+        />
+
+        {route.note && (
+          <View style={styles.noteRow}>
+            <InfoCircle size={14} color={colors.textMuted} />
+            <Text style={styles.noteText}>{route.note}</Text>
           </View>
-          {selected.shape === 'loop' && (
-            <View style={styles.legendItem}>
-              <View style={styles.legendJoin} />
-              <Text style={styles.legendLabel}>Suggested join point</Text>
-            </View>
-          )}
-          {selected.shape !== 'loop' && (
-            <View style={styles.legendItem}>
-              <View style={styles.legendEnd} />
-              <Text style={styles.legendLabel}>Finish</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>ALL ROUTES</Text>
-          <Text style={styles.sectionCount}>{OPTIONS.length} OPTIONS</Text>
-        </View>
-
-        {OPTIONS.map((option) => {
-          const isSelected = option.id === selectedId;
-          return (
-            <Pressable
-              key={option.id}
-              style={[styles.routeCard, isSelected && styles.routeCardSelected]}
-              onPress={() => setSelectedId(option.id)}
-            >
-              {isSelected && (
-                <View style={styles.selectedBadge}>
-                  <Text style={styles.selectedBadgeText}>SELECTED</Text>
-                </View>
-              )}
-
-              <View style={styles.routeTop}>
-                <Text style={styles.routeName}>{option.name}</Text>
-                <View style={styles.paceBlock}>
-                  <Text style={styles.paceValue}>{option.paceKmh} km/h</Text>
-                  <Text style={styles.paceLabel}>EST. PACE</Text>
-                </View>
-              </View>
-
-              <View style={styles.routeMeta}>
-                <Text style={styles.routeMetaText}>{option.distanceKm} KM</Text>
-                <View style={styles.routeMetaDot} />
-                <Text style={styles.routeMetaText}>{option.difficulty}</Text>
-                <View style={styles.routeMetaDot} />
-                <Text style={styles.routeMetaText}>{shapeLabel(option.shape)}</Text>
-              </View>
-
-              <View style={styles.routeDivider} />
-
-              <View style={styles.routeStatsRow}>
-                <View style={styles.routeStatItem}>
-                  <UsersGroupTwoRounded size={16} color={colors.primary} />
-                  <Text style={styles.routeStatText}>{option.riders} riders</Text>
-                </View>
-                <View style={styles.routeStatItem}>
-                  <Bolt size={16} color={colors.primary} />
-                  <Text style={styles.routeStatText}>{option.draftPercent}% draft</Text>
-                </View>
-                <View style={styles.routeStatItem}>
-                  <View
-                    style={[
-                      styles.trafficDot,
-                      { backgroundColor: trafficColor(option.traffic) },
-                    ]}
-                  />
-                  <Text style={styles.routeStatText}>
-                    Traffic: {trafficLabel(option.traffic)}
-                  </Text>
-                </View>
-              </View>
-
-              {option.note && (
-                <View style={styles.routeNote}>
-                  <InfoCircle size={14} color={colors.textMuted} />
-                  <Text style={styles.routeNoteText}>{option.note}</Text>
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
+        )}
       </ScrollView>
 
       <Pressable
@@ -325,34 +232,76 @@ export default function RouteDetailsScreen() {
           { marginBottom: Math.max(insets.bottom, spacing.sm) },
         ]}
         onPress={handleStart}
+        accessibilityRole="button"
       >
         <Text style={styles.primaryButtonText}>START THIS ROUTE</Text>
+        <ArrowRight size={20} color={colors.textOnPrimary} />
       </Pressable>
     </View>
   );
 }
 
-function shapeLabel(shape: RouteShape): string {
-  switch (shape) {
-    case 'loop':
-      return 'LOOP';
-    case 'out-and-back':
-      return 'OUT & BACK';
-    case 'point-to-point':
-      return 'POINT TO POINT';
+/**
+ * Single text row + hairline divider. The whole screen below the pill
+ * row is built from these, so the layout is purely typography +
+ * dividers (no card chrome).
+ */
+function StatRow({
+  label,
+  value,
+  hint,
+  multilineValue,
+}: {
+  label: string;
+  value: string;
+  /** Optional secondary line shown muted below the value. */
+  hint?: string;
+  /** Allow the value text to wrap onto multiple lines. */
+  multilineValue?: boolean;
+}) {
+  return (
+    <View style={styles.statRow}>
+      <Text style={styles.statRowLabel}>{label}</Text>
+      <View style={styles.statRowBody}>
+        <Text
+          style={[styles.statRowValue, multilineValue && styles.statRowValueWrap]}
+          numberOfLines={multilineValue ? undefined : 1}
+        >
+          {value}
+        </Text>
+        {hint ? <Text style={styles.statRowHint}>{hint}</Text> : null}
+      </View>
+    </View>
+  );
+}
+
+function Tag({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <View style={styles.tag}>
+      {icon}
+      <Text style={styles.tagLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function shapeBlurb(shape: ReturnType<typeof shapeLabel> extends string ? string : never): string {
+  switch (shape as string) {
+    case 'Loop':
+      return 'A closed circuit that returns you to the start. Best for fixed-time sessions and predictable drafting rotations.';
+    case 'Out & back':
+      return 'Ride to a turnaround point and return the same way. Wind shift helps on one leg, hurts on the other — plan effort accordingly.';
+    case 'Point to point':
+      return 'One-way ride that ends at a different location. Arrange your return or schedule pickup at the finish.';
+    default:
+      return '';
   }
 }
 
-function trafficLabel(level: RouteOption['traffic']): string {
-  if (level === 'CLEAR') return 'Clear';
-  if (level === 'MODERATE') return 'Moderate';
-  return 'Heavy';
-}
-
-function trafficColor(level: RouteOption['traffic']): string {
-  if (level === 'CLEAR') return '#3FBF6E';
-  if (level === 'MODERATE') return '#F2A93B';
-  return '#E5484D';
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
 const styles = StyleSheet.create({
@@ -375,13 +324,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  destLabel: {
+  headerText: {
+    flex: 1,
+  },
+  headerKicker: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
   },
-  destName: {
+  headerTitle: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
     fontStyle: 'italic',
@@ -401,32 +353,6 @@ const styles = StyleSheet.create({
     borderRadius: radius['2xl'],
     overflow: 'hidden',
     backgroundColor: colors.surfaceElevated,
-  },
-  mapBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  mapBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  mapBadgeText: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
   },
   startPin: {
     width: 18,
@@ -462,225 +388,102 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.background,
   },
-  routeSummary: {
+  // Divider-list stat row — replaces both the old "hero stats" card
+  // and the WHAT TO EXPECT card. Label on the left, value on the
+  // right, hairline divider underneath.
+  statRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.inactiveOnDark,
   },
-  summaryLabel: {
+  statRowLabel: {
+    width: 90,
     color: colors.textMuted,
     fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size['2xs'],
+    fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
-    marginBottom: spacing['2xs'],
+    textTransform: 'uppercase',
   },
-  summaryName: {
+  statRowBody: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  statRowValue: {
     color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.base,
-    marginBottom: spacing['3xs'],
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.sm,
+    textAlign: 'right',
   },
-  summaryMeta: {
+  statRowValueWrap: {
+    textAlign: 'right',
+    lineHeight: typography.size.sm * typography.lineHeight.normal,
+  },
+  statRowHint: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wide,
+    marginTop: spacing['3xs'],
+    textAlign: 'right',
   },
-  summaryRight: {
-    alignItems: 'flex-end',
-  },
-  summaryStat: {
-    color: colors.primary,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.lg,
-  },
-  summaryStatLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  legendRow: {
+  // Tag chips
+  tagRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    flexWrap: 'wrap',
+    gap: spacing.xs,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.xl,
   },
-  legendItem: {
+  tag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-  },
-  legendStart: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.pill,
-    backgroundColor: colors.textOnDark,
-    borderWidth: 2,
-    borderColor: colors.background,
-  },
-  legendEnd: {
-    width: 8,
-    height: 12,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  legendJoin: {
-    width: 12,
-    height: 12,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  legendLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.xs,
-  },
-  sectionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wider,
-  },
-  sectionCount: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.xs,
-  },
-  routeCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius['2xl'],
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-  },
-  routeCardSelected: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  selectedBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: colors.primary,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderBottomLeftRadius: radius.md,
-  },
-  selectedBadgeText: {
-    color: colors.textOnPrimary,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  routeTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xs,
-    paddingRight: spacing['4xl'],
-  },
-  routeName: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.lg,
-    flex: 1,
-  },
-  paceBlock: {
-    alignItems: 'flex-end',
-    marginTop: spacing.md,
-  },
-  paceValue: {
-    color: colors.primary,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.base,
-  },
-  paceLabel: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  routeMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  routeMetaText: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  routeMetaDot: {
-    width: 3,
-    height: 3,
     borderRadius: radius.pill,
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  routeDivider: {
-    height: 1,
-    backgroundColor: colors.inactiveOnDark,
-    opacity: 0.5,
-    marginBottom: spacing.md,
-  },
-  routeStatsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  routeStatItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  routeStatText: {
+  tagLabel: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size.xs,
+    fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
+    textTransform: 'capitalize',
   },
   trafficDot: {
     width: 8,
     height: 8,
     borderRadius: radius.pill,
   },
-  routeNote: {
+  noteRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xs,
   },
-  routeNoteText: {
+  noteText: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.medium,
     fontStyle: 'italic',
     fontSize: typography.size.xs,
   },
+  // CTA
   primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
     marginHorizontal: spacing.lg,
-    alignItems: 'center',
+    marginTop: spacing.sm,
   },
   primaryButtonText: {
     color: colors.textOnPrimary,

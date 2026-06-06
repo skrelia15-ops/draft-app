@@ -1,126 +1,73 @@
-import { useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
+import { useMemo, useRef, useState } from 'react';
 import {
-  Magnifier,
-  Map as MapIcon,
-  AltArrowRight,
-} from '@solar-icons/react-native/Linear';
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  Pressable,
+} from 'react-native';
+import { router, Href } from 'expo-router';
+import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Search, ChevronRight, XCircle } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '@/theme';
 import { darkMapStyle, type LatLng } from '@/lib/maps';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { buildRoutePreview } from '@/lib/ride';
 import {
-  buildRoutePreview,
-  getCurrentConditions,
-  trafficWeight,
-  type RouteShape,
-  type TrafficLevel,
-} from '@/lib/ride';
+  ROUTE_CATALOG,
+  hashIdSeed,
+  shapeLabel,
+  type CatalogRoute,
+} from '@/lib/routes';
 import {
-  ElevatedCard,
   IconButton,
-  ListItemCard,
   PrimaryCard,
-  ui,
+  SegmentedTabs,
 } from '@/components/ui/draft';
 
 const TAB_BAR_SAFE_AREA = 110;
 
-const FILTERS = ['WITH DRAFT', 'SCENIC', 'POPULAR', 'PERFORMANCE', 'EASY'] as const;
+// Three filters keep the list scannable and the labels obvious — the
+// previous 5-tab strip read as jargon.
+const FILTERS = ['ALL', 'POPULAR', 'BY DIFFICULTY'] as const;
 type ExploreFilter = (typeof FILTERS)[number];
 
-type ExploreRoute = {
-  id: string;
-  name: string;
-  distanceKm: number;
-  draftPercent: number;
-  riders: number;
-  shape: RouteShape;
-  traffic: TrafficLevel;
-  paceKmh: number;
-  difficulty: 'EASY' | 'MODERATE' | 'HARD';
-};
-
-const ROUTES: ExploreRoute[] = [
-  {
-    id: 'coastal',
-    name: 'COASTAL SLIPSTREAM',
-    distanceKm: 24.5,
-    draftPercent: 92,
-    riders: 8,
-    shape: 'point-to-point',
-    traffic: 'CLEAR',
-    paceKmh: 32,
-    difficulty: 'MODERATE',
-  },
-  {
-    id: 'urban',
-    name: 'URBAN DRAFT LOOP',
-    distanceKm: 12.2,
-    draftPercent: 88,
-    riders: 15,
-    shape: 'loop',
-    traffic: 'MODERATE',
-    paceKmh: 28,
-    difficulty: 'EASY',
-  },
-  {
-    id: 'mountain',
-    name: 'MOUNTAIN PASS',
-    distanceKm: 35.0,
-    draftPercent: 78,
-    riders: 4,
-    shape: 'out-and-back',
-    traffic: 'CLEAR',
-    paceKmh: 24,
-    difficulty: 'HARD',
-  },
-];
+type ExploreRoute = CatalogRoute;
 
 const FILTER_SECTION_LABEL: Record<ExploreFilter, string> = {
-  'WITH DRAFT': 'TOP DRAFT ROUTES',
-  SCENIC: 'SCENIC ROUTES',
-  POPULAR: 'POPULAR ROUTES',
-  PERFORMANCE: 'HIGH-INTENSITY ROUTES',
-  EASY: 'EASY ROUTES',
+  ALL: 'ALL ROUTES',
+  POPULAR: 'MOST RIDERS RIGHT NOW',
+  'BY DIFFICULTY': 'EASY TO HARD',
+};
+
+const FILTER_SUBTITLE: Record<ExploreFilter, string> = {
+  ALL: 'Every route, sorted by drafting potential',
+  POPULAR: 'Where other riders are right now',
+  'BY DIFFICULTY': 'Beginner-friendly routes first',
 };
 
 const MANHATTAN: LatLng = { latitude: 40.7484, longitude: -73.9857 };
 
-function hashIdSeed(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h = Math.imul(h ^ id.charCodeAt(i), 16777619);
-  }
-  return h >>> 0;
-}
-
-function shapeLabel(s: RouteShape): string {
-  if (s === 'loop') return 'Loop';
-  if (s === 'out-and-back') return 'Out & back';
-  return 'Point to point';
-}
+const DIFFICULTY_RANK: Record<ExploreRoute['difficulty'], number> = {
+  EASY: 0,
+  MODERATE: 1,
+  HARD: 2,
+};
 
 function filterRoutes(routes: ExploreRoute[], filter: ExploreFilter): ExploreRoute[] {
   const copy = [...routes];
   switch (filter) {
-    case 'WITH DRAFT':
+    case 'ALL':
       return copy.sort((a, b) => b.draftPercent - a.draftPercent);
-    case 'SCENIC':
-      return copy.sort(
-        (a, b) =>
-          trafficWeight(a.traffic) - trafficWeight(b.traffic) ||
-          b.distanceKm - a.distanceKm,
-      );
     case 'POPULAR':
       return copy.sort((a, b) => b.riders - a.riders);
-    case 'PERFORMANCE':
-      return copy.sort((a, b) => b.paceKmh - a.paceKmh);
-    case 'EASY':
-      return copy
-        .filter((r) => r.difficulty === 'EASY' || r.paceKmh <= 28)
-        .sort((a, b) => a.paceKmh - b.paceKmh);
+    case 'BY DIFFICULTY':
+      return copy.sort(
+        (a, b) =>
+          DIFFICULTY_RANK[a.difficulty] - DIFFICULTY_RANK[b.difficulty] ||
+          a.paceKmh - b.paceKmh,
+      );
     default:
       return copy;
   }
@@ -174,18 +121,28 @@ function RouteCardBody({ route, featured }: { route: ExploreRoute; featured?: bo
 
 export default function ExploreScreen() {
   const { coords } = useUserLocation();
-  const [activeFilter, setActiveFilter] = useState<ExploreFilter>('WITH DRAFT');
-  const conditions = useMemo(() => getCurrentConditions(), []);
+  const [activeFilter, setActiveFilter] = useState<ExploreFilter>('ALL');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<TextInput | null>(null);
   const origin = coords ?? MANHATTAN;
 
-  const filteredRoutes = useMemo(
-    () => filterRoutes(ROUTES, activeFilter),
-    [activeFilter],
-  );
+  /**
+   * Apply the active filter first, then narrow further with the
+   * search query. When the user is searching we ignore the filter so they
+   * can find a route by name even if the wrong filter tab is active.
+   */
+  const filteredRoutes = useMemo(() => {
+    const trimmed = searchQuery.trim().toLowerCase();
+    if (trimmed) {
+      return ROUTE_CATALOG.filter((r) => r.name.toLowerCase().includes(trimmed));
+    }
+    return filterRoutes(ROUTE_CATALOG, activeFilter);
+  }, [activeFilter, searchQuery]);
 
   const previewById = useMemo(() => {
     const map = new Map<string, ReturnType<typeof buildRoutePreview>>();
-    for (const route of ROUTES) {
+    for (const route of ROUTE_CATALOG) {
       map.set(
         route.id,
         buildRoutePreview({
@@ -199,37 +156,26 @@ export default function ExploreScreen() {
     return map;
   }, [origin]);
 
-  const overviewPreview = useMemo(
-    () =>
-      buildRoutePreview({
-        origin,
-        shape: 'loop',
-        distanceKm: 20,
-        seed: 12345,
-      }),
-    [origin],
-  );
+  const handleToggleSearch = () => {
+    setSearchOpen((open) => {
+      const next = !open;
+      if (!next) setSearchQuery('');
+      // Defer focus a frame so the input is mounted.
+      if (next) setTimeout(() => searchInputRef.current?.focus(), 50);
+      return next;
+    });
+  };
 
-  const region = useMemo(() => {
-    const lats = overviewPreview.coordinates.map((c) => c.latitude);
-    const lngs = overviewPreview.coordinates.map((c) => c.longitude);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    return {
-      latitude: (minLat + maxLat) / 2,
-      longitude: (minLng + maxLng) / 2,
-      latitudeDelta: Math.max(0.01, (maxLat - minLat) * 1.6),
-      longitudeDelta: Math.max(0.01, (maxLng - minLng) * 1.6),
-    };
-  }, [overviewPreview]);
+  const sectionLabel = searchQuery.trim()
+    ? `RESULTS · ${filteredRoutes.length}`
+    : FILTER_SECTION_LABEL[activeFilter];
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
     >
       <View style={styles.headerRow}>
         <View>
@@ -238,130 +184,106 @@ export default function ExploreScreen() {
         </View>
         <View style={styles.headerActions}>
           <IconButton
-            onPress={() => router.push('/ride/map' as Href)}
-            accessibilityLabel="Search destination"
-            icon={<Magnifier size={20} color={colors.textOnDark} />}
-          />
-          <IconButton
-            onPress={() => router.push('/ride/map' as Href)}
-            accessibilityLabel="Open map"
-            icon={<MapIcon size={20} color={colors.textOnDark} />}
+            onPress={handleToggleSearch}
+            accessibilityLabel={searchOpen ? 'Close search' : 'Search routes'}
+            selected={searchOpen}
+            icon={
+              searchOpen ? (
+                <XCircle size={20} color={colors.textOnDark} />
+              ) : (
+                <Search size={20} color={colors.textOnDark} />
+              )
+            }
           />
         </View>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersScroll}
-        contentContainerStyle={styles.filtersContent}
-      >
-        {FILTERS.map((label) => {
-          const active = label === activeFilter;
-          return (
+      {searchOpen && (
+        <View style={styles.searchShell}>
+          <Search size={18} color={colors.textMuted} />
+          <TextInput
+            ref={searchInputRef}
+            value={searchQuery}
+            // Strip the leading space — typing a single space at the
+            // start of a search is almost always a fat-finger error and
+            // breaks the trim-based "is searching" check below.
+            onChangeText={(t) => setSearchQuery(t.replace(/^\s+/, ''))}
+            placeholder="Search routes by name"
+            placeholderTextColor={colors.textMuted}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
             <Pressable
-              key={label}
-              style={[styles.filter, active && styles.filterActive]}
-              onPress={() => setActiveFilter(label)}
+              onPress={() => setSearchQuery('')}
+              hitSlop={spacing.xs}
+              accessibilityLabel="Clear search"
             >
-              <Text style={[styles.filterText, active && styles.filterActiveText]}>
-                {label}
-              </Text>
-              {active && <View style={styles.filterUnderline} />}
+              <XCircle size={18} color={colors.textMuted} />
             </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <ElevatedCard
-        style={styles.mapPreviewWrap}
-        onPress={() => router.push('/ride/map' as Href)}
-      >
-        <MapView
-          provider={PROVIDER_GOOGLE}
-          style={StyleSheet.absoluteFill}
-          customMapStyle={darkMapStyle}
-          region={region}
-          pointerEvents="none"
-          toolbarEnabled={false}
-          showsCompass={false}
-          showsMyLocationButton={false}
-          showsPointsOfInterest={false}
-          showsBuildings={false}
-        >
-          <Polyline
-            coordinates={overviewPreview.coordinates}
-            strokeColor={colors.background}
-            strokeWidth={8}
-            lineCap="round"
-            lineJoin="round"
-            zIndex={1}
-          />
-          <Polyline
-            coordinates={overviewPreview.coordinates}
-            strokeColor={colors.textOnDark}
-            strokeWidth={5}
-            lineCap="round"
-            lineJoin="round"
-            zIndex={2}
-          />
-          <Marker coordinate={overviewPreview.origin} anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={styles.startPin}>
-              <View style={styles.startPinInner} />
-            </View>
-          </Marker>
-        </MapView>
-        <View style={styles.mapBadge}>
-          <Text style={styles.mapBadgeText}>
-            Draft index {conditions.draftIndex}% · {conditions.windKmh} km/h {conditions.windFrom}
-          </Text>
+          )}
         </View>
-        <View style={styles.mapCtaRow}>
-          <Text style={styles.mapCta}>Open interactive map</Text>
-          <AltArrowRight size={16} color={colors.textOnDark} />
-        </View>
-      </ElevatedCard>
+      )}
 
-      <Text style={styles.sectionTitle}>{FILTER_SECTION_LABEL[activeFilter]}</Text>
+      {/* Hide filter tabs while searching — they don't apply. */}
+      {!searchQuery.trim() && (
+        <SegmentedTabs
+          options={FILTERS}
+          value={activeFilter}
+          onChange={setActiveFilter}
+          contentInsetHorizontal={spacing.lg}
+          style={styles.filters}
+        />
+      )}
+
+      <Text style={styles.sectionTitle}>{sectionLabel}</Text>
+      {/* A subtitle behind every active filter — keeps the user oriented
+          about WHY routes are sorted the way they are. Hidden during a
+          text search since the heading already explains "RESULTS · N". */}
+      {!searchQuery.trim() && (
+        <Text style={styles.sectionSubtitle}>
+          {FILTER_SUBTITLE[activeFilter]}
+        </Text>
+      )}
 
       {filteredRoutes.length === 0 ? (
         <PrimaryCard style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No routes match this filter</Text>
-          <Text style={styles.emptyBody}>Try another tab to see more options nearby.</Text>
+          <Text style={styles.emptyTitle}>
+            {searchQuery.trim() ? 'No routes match your search' : 'No routes match this filter'}
+          </Text>
+          <Text style={styles.emptyBody}>
+            {searchQuery.trim()
+              ? 'Try a shorter or different name.'
+              : 'Try another tab to see more options nearby.'}
+          </Text>
         </PrimaryCard>
       ) : (
-        filteredRoutes.map((route, index) => {
+        filteredRoutes.map((route) => {
           const preview = previewById.get(route.id)!;
-          const featured = index === 0;
-
-          if (featured) {
-            return (
-              <ElevatedCard
-                key={route.id}
-                style={styles.featuredRouteCard}
-                onPress={() => router.push('/ride/route-details' as Href)}
-              >
-                <View style={styles.featuredRow}>
-                  <RouteMiniMap preview={preview} featured />
-                  <View style={styles.featuredBody}>
-                    <RouteCardBody route={route} featured />
-                  </View>
-                  <AltArrowRight size={20} color={colors.textMuted} />
-                </View>
-              </ElevatedCard>
-            );
-          }
-
+          const detailsHref = `/ride/route-details?id=${route.id}` as Href;
           return (
-            <ListItemCard
+            <Pressable
               key={route.id}
-              style={styles.routeCard}
-              onPress={() => router.push('/ride/route-details' as Href)}
-              leading={<RouteMiniMap preview={preview} />}
-              trailing={<AltArrowRight size={20} color={colors.textMuted} />}
+              accessibilityRole="button"
+              onPress={() => router.push(detailsHref)}
+              style={({ pressed }) => [
+                styles.routeRow,
+                pressed && styles.routeRowPressed,
+              ]}
             >
-              <RouteCardBody route={route} />
-            </ListItemCard>
+              {/* Map sits flush with the card's left/top/bottom edges —
+                  no inner padding around it. Only the text block gets
+                  the usual padding. */}
+              <RouteMiniMap preview={preview} />
+              <View style={styles.routeRowBody}>
+                <RouteCardBody route={route} />
+              </View>
+              <View style={styles.routeRowTrailing}>
+                <ChevronRight size={20} color={colors.textMuted} />
+              </View>
+            </Pressable>
           );
         })
       )}
@@ -417,102 +339,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  filtersScroll: {
-    marginBottom: spacing.xl,
+  filters: {
+    marginBottom: spacing.lg,
   },
-  filtersContent: {
-    paddingHorizontal: spacing.lg,
+  searchShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
-  },
-  filter: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: 'rgba(255,255,255,0.06)',
   },
-  filterActive: {
-    backgroundColor: colors.surfaceElevated,
-    borderColor: 'rgba(255,255,255,0.12)',
-    ...ui.softShadow,
-  },
-  filterUnderline: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing['2xs'],
-    height: 2,
-    borderRadius: radius.pill,
-    backgroundColor: colors.textOnDark,
-  },
-  filterText: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  filterActiveText: {
+  searchInput: {
+    flex: 1,
     color: colors.textOnDark,
-  },
-  mapPreviewWrap: {
-    marginHorizontal: spacing.lg,
-    height: 200,
-    overflow: 'hidden',
-    marginBottom: spacing.xl,
-    padding: 0,
-  },
-  startPin: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.pill,
-    backgroundColor: colors.textOnDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.background,
-  },
-  startPinInner: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.background,
-  },
-  mapBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  mapBadgeText: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  mapCtaRow: {
-    position: 'absolute',
-    bottom: spacing.md,
-    left: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-  },
-  mapCta: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wide,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.sm,
+    paddingVertical: spacing['2xs'],
   },
   sectionTitle: {
     color: colors.textMuted,
@@ -520,34 +368,50 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wider,
     paddingHorizontal: spacing.lg,
+    marginBottom: spacing['2xs'],
+  },
+  sectionSubtitle: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size.xs,
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
+    opacity: 0.7,
   },
-  featuredRouteCard: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  featuredRow: {
+  // Route row — flat dark surface, map flush with the left and full-
+  // height edges of the card. Only the text block carries inner padding.
+  routeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  featuredBody: {
-    flex: 1,
-  },
-  routeCard: {
+    alignItems: 'stretch',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
+    minHeight: 100,
   },
+  routeRowPressed: {
+    opacity: 0.92,
+  },
+  routeRowBody: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+  },
+  routeRowTrailing: {
+    paddingRight: spacing.md,
+    justifyContent: 'center',
+  },
+  // The map fills the row's full height (alignItems: stretch on parent),
+  // and is a fixed width — no padding/border-radius locally because the
+  // parent already clips with overflow: hidden.
   routeMiniMap: {
-    width: 64,
-    height: 52,
-    borderRadius: radius.md,
-    overflow: 'hidden',
+    width: 110,
     backgroundColor: colors.background,
   },
   routeMiniMapFeatured: {
-    width: 72,
-    height: 58,
+    width: 110,
   },
   routeName: {
     color: colors.textOnDark,

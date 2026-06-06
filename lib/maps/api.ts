@@ -352,6 +352,143 @@ function classifyTraffic(
   return 'HEAVY';
 }
 
+function haversineMeters(a: LatLng, b: LatLng): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Build a Manhattan-style fallback polyline between two coordinates when
+ * the Directions API is unavailable. The path is composed of two
+ * grid-aligned (lat/lng axis) segments with a couple of jogs in the
+ * middle so it reads as "following streets" rather than a smooth bezier
+ * dropped across the city.
+ *
+ * The route is purely cosmetic — distance is approximated by the
+ * great-circle haversine of the two endpoints. We never try to fake a
+ * road network: it's a visual placeholder until the API key is wired up.
+ */
+function buildSyntheticRoute(origin: LatLng, destination: LatLng): RouteResult {
+  const distanceMeters = Math.max(100, haversineMeters(origin, destination));
+  const distanceKm = distanceMeters / 1000;
+  const seed =
+    Math.imul(Math.round(origin.latitude * 1e4), 997) ^
+    Math.imul(Math.round(origin.longitude * 1e4), 991) ^
+    Math.imul(Math.round(destination.latitude * 1e4), 983) ^
+    Math.imul(Math.round(destination.longitude * 1e4), 977);
+
+  const coordinates = buildGridPath(origin, destination, seed >>> 0);
+  const lats = coordinates.map((c) => c.latitude);
+  const lngs = coordinates.map((c) => c.longitude);
+  // 18 km/h is roughly a relaxed urban cycling pace.
+  const durationSeconds = Math.round((distanceKm / 18) * 3600);
+  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
+  return {
+    mode: 'bicycling',
+    distanceMeters: Math.round(distanceMeters),
+    distanceText: `${distanceKm.toFixed(1)} km`,
+    durationSeconds,
+    durationText: `${durationMinutes} min`,
+    coordinates,
+    bounds: {
+      northeast: {
+        latitude: Math.max(...lats),
+        longitude: Math.max(...lngs),
+      },
+      southwest: {
+        latitude: Math.min(...lats),
+        longitude: Math.min(...lngs),
+      },
+    },
+    endAddress: 'Destination',
+    startAddress: 'Origin',
+    trafficLevel: null,
+    alternativeCount: 0,
+  };
+}
+
+/**
+ * Construct a stair-stepped polyline from origin to destination that uses
+ * only horizontal (constant-latitude) and vertical (constant-longitude)
+ * segments. Two pivot points are introduced so the path doesn't look like
+ * a single right-angle elbow.
+ */
+function buildGridPath(origin: LatLng, destination: LatLng, seed: number): LatLng[] {
+  const rng = mulberry32(seed);
+  const dLat = destination.latitude - origin.latitude;
+  const dLng = destination.longitude - origin.longitude;
+
+  // Pick two break-points along the journey at ~1/3 and ~2/3.
+  // Alternate which axis turns first so consecutive routes don't look
+  // identical from a given origin.
+  const latFirst = rng() > 0.5;
+  const t1 = 0.28 + rng() * 0.1;
+  const t2 = 0.62 + rng() * 0.1;
+
+  const p1: LatLng = latFirst
+    ? { latitude: origin.latitude + dLat * t1, longitude: origin.longitude }
+    : { latitude: origin.latitude, longitude: origin.longitude + dLng * t1 };
+
+  const p2: LatLng = latFirst
+    ? {
+        latitude: origin.latitude + dLat * t1,
+        longitude: origin.longitude + dLng * t2,
+      }
+    : {
+        latitude: origin.latitude + dLat * t2,
+        longitude: origin.longitude + dLng * t1,
+      };
+
+  const p3: LatLng = latFirst
+    ? {
+        latitude: origin.latitude + dLat * t2,
+        longitude: origin.longitude + dLng * t2,
+      }
+    : {
+        latitude: origin.latitude + dLat * t2,
+        longitude: origin.longitude + dLng * t2,
+      };
+
+  // Densify each leg so the dark-map polyline looks crisp without
+  // needing line smoothing.
+  const path: LatLng[] = [];
+  const legs: [LatLng, LatLng][] = [
+    [origin, p1],
+    [p1, p2],
+    [p2, p3],
+    [p3, destination],
+  ];
+  legs.forEach(([a, b], idx) => {
+    const steps = 8;
+    for (let i = idx === 0 ? 0 : 1; i <= steps; i++) {
+      const t = i / steps;
+      path.push({
+        latitude: a.latitude + (b.latitude - a.latitude) * t,
+        longitude: a.longitude + (b.longitude - a.longitude) * t,
+      });
+    }
+  });
+  return path;
+}
+
+function mulberry32(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = t;
+    r = Math.imul(r ^ (r >>> 15), r | 1);
+    r ^= r + Math.imul(r ^ (r >>> 7), r | 61);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 /**
  * Cycling-first directions. Falls back to driving (with traffic) when
  * cycling isn't supported in the region — Directions API returns
@@ -363,6 +500,11 @@ export async function getCyclingDirections(
   destination: LatLng,
   signal?: AbortSignal,
 ): Promise<RouteResult> {
+  if (!API_KEY) {
+    if (__DEV__) console.warn('[maps] No API key — using synthetic route fallback.');
+    return buildSyntheticRoute(origin, destination);
+  }
+
   const cycling = await fetchDirections(origin, destination, 'bicycling', signal);
   if (cycling) {
     try {

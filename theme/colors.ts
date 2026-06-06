@@ -1,20 +1,19 @@
 /**
- * Color tokens — inferred strictly from Figma onboarding screens.
- * Source values from Figma:
- *   #F6EB4C  Brand yellow (Onboarding-1 background, Onboarding-2 button, Onboarding-3 active dot)
- *   #111111  Dark surface / text (Onboarding-1/2 text, Onboarding-3 background, Onboarding-1 button)
- *   #1F1F1F  Card / elevated surface — single shared color for every card-like
- *            container (route cards, hero, bottom sheets, tab bar, search input,
- *            field, pill chip). Sits one step above `background`.
- *   #FFFFFF  Light surface / text (Onboarding-2 background, Onboarding-3 text, Onboarding-3 button)
- *   #C9C16A  Inactive control on yellow surface (Onboarding-1 inactive dots)
- *   #D9D9D9  Inactive control on light surface (Onboarding-2 inactive dots)
- *   #3D3D3D  Inactive control on dark surface (Onboarding-3 inactive dots) —
- *            also used for borders / dividers on top of card surfaces.
+ * Color tokens — taken directly from the Figma "Draft app" library.
+ *
+ *   #F9F186  surface/accent       Brand yellow (tab-bar ride button, hero card, CTAs)
+ *   #111111  surface/static-black App background and tab-bar pill
+ *   #1F1F1F  Card / elevated surface — every card-like container sits one step
+ *            above the background on this fill.
+ *   #FFFFFF  surface/primary      Light surface (used sparingly)
+ *   #F1F1F1  Primary text-on-dark — slightly off-white per Figma library
+ *
+ * Inactive variants are derived from opacity in component styles (e.g.
+ * `rgba(241,241,241,0.3)` for muted text on dark) rather than separate tokens.
  */
 export const colors = {
   // Brand
-  primary: '#F6EB4C',
+  primary: '#F9F186',
 
   // Surfaces
   background: '#111111',
@@ -22,7 +21,7 @@ export const colors = {
   surfaceElevated: '#1F1F1F',
 
   // Text
-  textOnDark: '#FFFFFF',
+  textOnDark: '#F1F1F1',
   textOnLight: '#111111',
   textOnPrimary: '#111111',
   textMuted: '#D9D9D9',

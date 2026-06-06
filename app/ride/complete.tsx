@@ -1,14 +1,21 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+    formatDistanceMeters,
+    formatHourMin,
+    useRide,
+} from '@/lib/ride';
+import { colors, radius, spacing, typography } from '@/theme';
 import { CheckCircle } from '@solar-icons/react-native/Bold';
 import { ArrowRight } from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
-import {
-  formatDistanceMeters,
-  formatHourMin,
-  useRide,
-} from '@/lib/ride';
+import { Href, router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+/**
+ * Rides shorter than this don't have enough data to give meaningful
+ * analytics, so we show a "ride too short" empty state rather than
+ * confidently quoting 0 km / 30% saved / "Strong drafting".
+ */
+const MIN_USEFUL_DISTANCE_M = 100;
 
 export default function CompleteScreen() {
   const insets = useSafeAreaInsets();
@@ -19,10 +26,17 @@ export default function CompleteScreen() {
   const distance = lastFinished?.distanceMeters ?? 0;
   const duration = lastFinished?.durationSec ?? 0;
   const energyPercent = lastFinished?.energySavedPercent ?? 0;
+  const tooShort = distance < MIN_USEFUL_DISTANCE_M;
+
   const stats = [
     { label: 'DISTANCE', value: formatDistanceMeters(distance) },
     { label: 'TIME', value: formatHourMin(duration) },
-    { label: 'ENERGY SAVED', value: `${energyPercent}%` },
+    {
+      label: 'ENERGY SAVED',
+      // Don't quote a nonsensical 30% energy saved for a 0m ride — the
+      // sample buffer is too small to draw any conclusion.
+      value: tooShort ? '—' : `${energyPercent}%`,
+    },
   ];
 
   const goHome = () => {
@@ -52,11 +66,13 @@ export default function CompleteScreen() {
         </View>
 
         <Text style={styles.subtitle}>
-          {lastFinished
-            ? lastFinished.draftingFraction > 0.5
-              ? 'Strong drafting throughout. Recovery earned.'
-              : 'Good ride — there\u2019s more energy to save next time.'
-            : 'You rode smarter, safer, and faster.'}
+          {tooShort
+            ? 'Ride was too short to analyze. Try a longer route next time.'
+            : lastFinished
+              ? lastFinished.draftingFraction > 0.5
+                ? 'Strong drafting throughout. Recovery earned.'
+                : 'Good ride — there\u2019s more energy to save next time.'
+              : 'You rode smarter, safer, and faster.'}
         </Text>
 
         <View style={styles.statsRow}>

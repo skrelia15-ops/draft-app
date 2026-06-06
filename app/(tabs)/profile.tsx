@@ -1,22 +1,70 @@
-import { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, Image, StyleSheet } from 'react-native';
-import { router, Href } from 'expo-router';
-import { Bolt } from '@solar-icons/react-native/Bold';
-import { Pulse2, Tuning } from '@solar-icons/react-native/Linear';
-import { colors, radius, spacing, typography } from '@/theme';
+import { clearProfile, DEFAULT_PROFILE, useProfile } from '@/lib/profile';
 import {
-  formatDistanceMeters,
-  formatHourMin,
-  getCompatibility,
-  useRide,
-  type RideRecord,
+    clearHistory,
+    formatDistanceMeters,
+    formatHourMin,
+    getCompatibility,
+    useRide,
+    type RideRecord,
 } from '@/lib/ride';
+import { toast } from '@/lib/toast';
+import { colors, radius, spacing, typography } from '@/theme';
+import { Bolt } from '@solar-icons/react-native/Bold';
+import { Bicycling, Logout3, Tuning } from '@solar-icons/react-native/Linear';
+import { Href, router } from 'expo-router';
+import { useMemo } from 'react';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const TAB_BAR_SAFE_AREA = 110;
 
+/** First + last initial from a "First Last" name, capitalised. */
+function avatarInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/** Split a "First Last" name into the two stacked lines shown on the card. */
+function splitName(fullName: string): { first: string; last: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: 'RIDER', last: '' };
+  if (parts.length === 1) return { first: parts[0].toUpperCase(), last: '' };
+  return {
+    first: parts[0].toUpperCase(),
+    last: parts.slice(1).join(' ').toUpperCase(),
+  };
+}
+
 export default function ProfileScreen() {
-  const { history, lastFinished } = useRide();
+  const { history } = useRide();
+  const { profile, update } = useProfile();
   const compatibility = useMemo(() => getCompatibility(history), [history]);
+  const { first, last } = splitName(profile.name);
+  const bike = profile.bike;
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Log out?',
+      'Your profile, bike setup and ride history will be cleared. (Cloud sync is not enabled yet.)',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out',
+          style: 'destructive',
+          onPress: async () => {
+            await clearProfile();
+            await clearHistory();
+            // Reset the in-memory profile so the next screen shows defaults
+            // immediately, not the cached old values.
+            await update(DEFAULT_PROFILE);
+            toast.success('Logged out');
+            router.replace('/onboarding' as Href);
+          },
+        },
+      ],
+    );
+  };
 
   const totals = useMemo(() => {
     const rides = history.length;
@@ -47,18 +95,25 @@ export default function ProfileScreen() {
   ];
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.headerRow}>
         <View style={styles.avatarWrap}>
           <View style={styles.avatarRing}>
-            <Image
-              source={require('../../assets/images/onboarding/bike-bg.jpg')}
-              style={styles.avatarImage}
-            />
+            {profile.avatarUri ? (
+              <Image
+                source={{ uri: profile.avatarUri }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarInitials}>
+                {avatarInitials(profile.name)}
+              </Text>
+            )}
           </View>
           <View style={styles.avatarBadge}>
             <Bolt size={14} color={colors.textOnPrimary} />
@@ -66,8 +121,8 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.headerInfo}>
-          <Text style={styles.name}>ALEX</Text>
-          <Text style={styles.name}>RIDER</Text>
+          <Text style={styles.name}>{first}</Text>
+          {last ? <Text style={styles.name}>{last}</Text> : null}
           <View style={styles.levelRow}>
             <Text style={styles.levelHighlight}>
               {compatibility.tier} DRAFTER
@@ -78,7 +133,9 @@ export default function ProfileScreen() {
 
         <Pressable
           style={styles.settingsButton}
-          onPress={() => router.push('/onboarding/profile-setup' as Href)}
+          onPress={() =>
+            router.push('/onboarding/profile-setup?mode=edit' as Href)
+          }
         >
           <Tuning size={20} color={colors.textOnDark} />
         </Pressable>
@@ -107,27 +164,57 @@ export default function ProfileScreen() {
           <ActivityRow
             key={activity.id}
             activity={activity}
-            onPress={() => {
-              if (lastFinished?.id === activity.id) {
-                router.push('/ride/insights' as Href);
-              }
-            }}
+            // Any past ride opens the insights screen. The previous
+            // implementation only navigated for `lastFinished`, leaving
+            // older rows visually clickable but dead.
+            onPress={() => router.push('/ride/insights' as Href)}
           />
         ))
       )}
 
       <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>BIKE SETUP</Text>
 
-      <View style={styles.activityCard}>
-        <View style={styles.activityIcon}>
-          <Pulse2 size={20} color={colors.primary} />
+      {bike ? (
+        <View style={styles.activityCard}>
+          <View style={styles.activityIcon}>
+            <Bicycling size={20} color={colors.textOnDark} />
+          </View>
+          <View style={styles.activityBody}>
+            <Text style={styles.activityName}>{bike.name.toUpperCase()}</Text>
+            <Text style={styles.activityInfo}>
+              {bike.type.toUpperCase()} · {bike.weightKg}KG
+            </Text>
+          </View>
         </View>
-        <View style={styles.activityBody}>
-          <Text style={styles.activityName}>SPECIALIZED S-WORKS TARMAC</Text>
-          <Text style={styles.activityInfo}>AERO OPTIMIZED · 7.2KG</Text>
-        </View>
+      ) : (
+        <Pressable
+          style={styles.emptyCard}
+          onPress={() =>
+            router.push('/onboarding/profile-setup?mode=edit' as Href)
+          }
+        >
+          <Text style={styles.emptyText}>
+            No bike added yet. Tap settings to set up your bike.
+          </Text>
+        </Pressable>
+      )}
+
+      </ScrollView>
+
+      {/* Pinned above the floating tab bar — sits in a flex footer
+          rather than inside the scroll, so it never floats mid-screen. */}
+      <View style={styles.footer}>
+        <Pressable
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel="Log out"
+        >
+          <Logout3 size={18} color={colors.textMuted} />
+          <Text style={styles.logoutText}>LOG OUT</Text>
+        </Pressable>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -142,10 +229,8 @@ function ActivityRow({
   const duration = formatHourMin(activity.durationSec);
   const date = formatRelative(activity.endedAt);
   return (
-    <Pressable style={styles.activityCard} onPress={onPress}>
-      <View style={styles.activityIcon}>
-        <Pulse2 size={20} color={colors.textMuted} />
-      </View>
+    <Pressable style={styles.activityRow} onPress={onPress}>
+      <Bicycling size={18} color={colors.textMuted} />
       <View style={styles.activityBody}>
         <Text style={styles.activityName}>
           {activity.routeName ?? 'FREE RIDE'}
@@ -177,9 +262,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  scroll: {
+    flex: 1,
+  },
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing['4xl'],
+    // Smaller than the floating tab-bar height — the pinned footer
+    // below already reserves the rest.
+    paddingBottom: spacing.lg,
+  },
+  // Pinned footer sits between the scroll content and the floating
+  // tab bar. Vertical padding mirrors the safe-area handling on other
+  // screens.
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: TAB_BAR_SAFE_AREA,
   },
   headerRow: {
@@ -201,10 +299,19 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     overflow: 'hidden',
     backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
+  },
+  avatarInitials: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.extrabold,
+    fontStyle: 'italic',
+    fontSize: typography.size.xl,
+    letterSpacing: typography.letterSpacing.wide,
   },
   avatarBadge: {
     position: 'absolute',
@@ -301,6 +408,7 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     textAlign: 'center',
   },
+  // Bike setup keeps the card chrome — it's a single highlighted block.
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,6 +417,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.sm,
     marginBottom: spacing.sm,
+  },
+  // Recent activity rows are flat list items with a hairline divider —
+  // the section header alone provides enough hierarchy.
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.inactiveOnDark,
   },
   activityIcon: {
     width: 48,
@@ -348,5 +466,20 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size['2xs'],
     letterSpacing: typography.letterSpacing.wide,
+  },
+  // Log-out lives intentionally at the bottom, looks like a tertiary
+  // action (muted text + icon), and is gated behind a confirm Alert.
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  logoutText: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.xs,
+    letterSpacing: typography.letterSpacing.wider,
   },
 });

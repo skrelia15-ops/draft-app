@@ -1,3 +1,16 @@
+import {
+  AltArrowRight,
+  ArrowLeft,
+  ArrowRight,
+  CloseCircle,
+  DangerCircle,
+  Gps,
+  MapPoint,
+  Routing2,
+  TransferVertical,
+} from '@solar-icons/react-native/Linear';
+import * as Location from 'expo-location';
+import { router, Stack, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +23,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router, Stack, type Href } from 'expo-router';
 import MapView, {
   Marker,
   Polyline,
@@ -20,21 +32,9 @@ import MapView, {
   type Region,
 } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
-import {
-  ArrowLeft,
-  MapPoint,
-  Routing2,
-  ArrowRight,
-  AltArrowRight,
-  CloseCircle,
-  Gps,
-  DangerCircle,
-  TransferVertical,
-} from '@solar-icons/react-native/Linear';
 
-import { colors, radius, spacing, typography } from '@/theme';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { toast } from '@/lib/toast';
 import {
   autocompletePlaces,
   darkMapStyle,
@@ -45,6 +45,7 @@ import {
   type RouteResult,
 } from '@/lib/maps';
 import { useRide } from '@/lib/ride';
+import { colors, radius, spacing, typography } from '@/theme';
 
 /**
  * Default region centered on Manhattan — used briefly before the first
@@ -166,6 +167,7 @@ export default function RideMapScreen() {
         if (ctrl.signal.aborted) return;
         const message = e instanceof Error ? e.message : 'Unable to build route.';
         setRouteState({ kind: 'error', message });
+        toast.error('Route build failed', { text2: message });
       });
 
     return () => ctrl.abort();
@@ -380,6 +382,7 @@ export default function RideMapScreen() {
           ? (route.distanceMeters / route.durationSeconds) * 3.6
           : 28,
     });
+    toast.success('Ride started', { text2: route.distanceText + ' planned' });
     router.push('/ride/active' as Href);
   }, [destination, origin.coords, routeState, startRide]);
 
@@ -391,6 +394,16 @@ export default function RideMapScreen() {
 
   const showPermissionGate =
     locStatus === 'denied' || locStatus === 'unavailable';
+
+  // Toast once when permission is denied — the inline gate explains how
+  // to recover, but a top toast gives an immediate, unmissable cue.
+  useEffect(() => {
+    if (showPermissionGate) {
+      toast.error('Location permission required', {
+        text2: 'Enable it in Settings to plan a ride.',
+      });
+    }
+  }, [showPermissionGate]);
 
   const showRouteSummary =
     routeState.kind === 'loading' ||
@@ -520,6 +533,11 @@ export default function RideMapScreen() {
           onPress={() => setTrafficVisible((v) => !v)}
           style={[styles.sideButton, trafficVisible && styles.sideButtonActive]}
           hitSlop={spacing.xs}
+          accessibilityRole="button"
+          accessibilityLabel={
+            trafficVisible ? 'Hide traffic layer' : 'Show traffic layer'
+          }
+          accessibilityState={{ selected: trafficVisible }}
         >
           <Routing2
             size={20}
@@ -531,6 +549,8 @@ export default function RideMapScreen() {
           style={[styles.sideButton, !coords && styles.sideButtonDisabled]}
           hitSlop={spacing.xs}
           disabled={!coords}
+          accessibilityRole="button"
+          accessibilityLabel="Recenter map on me"
         >
           <Gps size={20} color={coords ? colors.primary : colors.textMuted} />
         </Pressable>
