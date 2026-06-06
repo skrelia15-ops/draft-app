@@ -1,11 +1,18 @@
 import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
-import { useProfile, type BikeType, type SkillLevel } from '@/lib/profile';
+import {
+  avatarSignedUrl,
+  isDirectUri,
+  uploadAvatar,
+  useProfile,
+  type BikeType,
+  type SkillLevel,
+} from '@/lib/profile';
 import { toast } from '@/lib/toast';
 import { colors, radius, spacing, typography } from '@/theme';
 import { ArrowLeft, Bicycling, Camera } from '@solar-icons/react-native/Linear';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
     Image,
@@ -78,6 +85,33 @@ export default function ProfileSetupScreen() {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }, [trimmedName]);
 
+  // Resolve the avatar to a renderable URI. A fresh `file://` pick or an
+  // `http(s)` URL renders directly; a Storage object path is resolved to a
+  // short-lived signed URL.
+  const [displayUri, setDisplayUri] = useState<string | null>(
+    avatarUri && isDirectUri(avatarUri) ? avatarUri : null,
+  );
+
+  useEffect(() => {
+    if (!avatarUri) {
+      setDisplayUri(null);
+      return;
+    }
+    if (isDirectUri(avatarUri)) {
+      setDisplayUri(avatarUri);
+      return;
+    }
+    // Storage path — resolve to a signed URL, ignoring stale results.
+    let active = true;
+    setDisplayUri(null);
+    avatarSignedUrl(avatarUri).then((url) => {
+      if (active) setDisplayUri(url);
+    });
+    return () => {
+      active = false;
+    };
+  }, [avatarUri]);
+
   const handleSubmit = async () => {
     if (!nameValid) {
       toast.error('Name is required');
@@ -96,11 +130,32 @@ export default function ProfileSetupScreen() {
       return;
     }
 
+    // If the user picked a NEW local image, upload it and persist the
+    // returned storage path instead of the transient file:// URI. On
+    // failure, warn but don't block the save — keep the previously
+    // persisted avatar value untouched.
+    let avatarToSave = avatarUri;
+    if (
+      avatarUri &&
+      avatarUri.startsWith('file://') &&
+      avatarUri !== profile.avatarUri
+    ) {
+      const path = await uploadAvatar(avatarUri);
+      if (path) {
+        avatarToSave = path;
+      } else {
+        toast.error('Avatar upload failed', {
+          text2: 'Saved your profile; photo unchanged.',
+        });
+        avatarToSave = profile.avatarUri;
+      }
+    }
+
     await update({
       name: trimmedName,
       skillLevel: skill,
       avgPaceKmh: Math.round(paceNumber),
-      avatarUri,
+      avatarUri: avatarToSave,
       bike: {
         name: bikeName.trim() || 'My bike',
         type: bikeType,
@@ -195,8 +250,8 @@ export default function ProfileSetupScreen() {
             ]}
           >
             <View style={styles.avatarRing}>
-              {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              {displayUri ? (
+                <Image source={{ uri: displayUri }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarInitials}>{initials}</Text>
               )}
