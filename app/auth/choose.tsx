@@ -1,10 +1,10 @@
 import { PrimaryButton, SecondaryButton } from '@/components/ui/draft';
 import { useAuth } from '@/lib/auth';
 import { toast } from '@/lib/toast';
-import { colors, spacing, typography } from '@/theme';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import { colors, radius, spacing, typography } from '@/theme';
+import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function ChooseAuthScreen() {
   const { signInWithApple, signInWithGoogle } = useAuth();
@@ -28,35 +28,46 @@ export default function ChooseAuthScreen() {
       </View>
 
       <View style={styles.actions}>
-        <PrimaryButton
-          onPress={() => router.push('/auth/sign-up/email' as Href)}
-        >
+        <PrimaryButton onPress={() => router.push('/auth/sign-up/email' as Href)}>
           CREATE ACCOUNT
         </PrimaryButton>
 
-        <SecondaryButton
-          onPress={() => router.push('/auth/sign-in' as Href)}
-        >
+        <SecondaryButton onPress={() => router.push('/auth/sign-in' as Href)}>
           I HAVE AN ACCOUNT
         </SecondaryButton>
 
-        {Platform.OS === 'ios' && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={
-              AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-            }
-            buttonStyle={
-              AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-            }
-            cornerRadius={12}
-            style={styles.appleButton}
-            onPress={() => social(signInWithApple)}
-          />
-        )}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
-        <SecondaryButton onPress={() => social(signInWithGoogle)}>
-          CONTINUE WITH GOOGLE
-        </SecondaryButton>
+        <View style={styles.socialRow}>
+          {Platform.OS === 'ios' && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign in with Apple"
+              onPress={() => social(signInWithApple)}
+              style={({ pressed }) => [
+                styles.socialButton,
+                pressed && styles.socialButtonPressed,
+              ]}
+            >
+              <Ionicons name="logo-apple" size={26} color={colors.textOnDark} />
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            onPress={() => social(signInWithGoogle)}
+            style={({ pressed }) => [
+              styles.socialButton,
+              pressed && styles.socialButtonPressed,
+            ]}
+          >
+            <Ionicons name="logo-google" size={24} color={colors.textOnDark} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -96,8 +107,36 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.md,
   },
-  appleButton: {
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.xs,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.inactiveOnDark,
+  },
+  dividerText: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.semibold,
+    fontSize: typography.size.xs,
+    letterSpacing: typography.letterSpacing.wider,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  socialButton: {
+    flex: 1,
     height: 52,
-    width: '100%',
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialButtonPressed: {
+    opacity: 0.7,
   },
 });
