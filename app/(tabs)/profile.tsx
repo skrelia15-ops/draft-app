@@ -1,6 +1,6 @@
-import { clearProfile, DEFAULT_PROFILE, useProfile } from '@/lib/profile';
+import { useAuth } from '@/lib/auth';
+import { useProfile } from '@/lib/profile';
 import {
-    clearHistory,
     formatDistanceMeters,
     formatHourMin,
     getCompatibility,
@@ -38,7 +38,8 @@ function splitName(fullName: string): { first: string; last: string } {
 
 export default function ProfileScreen() {
   const { history } = useRide();
-  const { profile, update } = useProfile();
+  const { profile } = useProfile();
+  const { signOut } = useAuth();
   const compatibility = useMemo(() => getCompatibility(history), [history]);
   const { first, last } = splitName(profile.name);
   const bike = profile.bike;
@@ -46,20 +47,16 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     Alert.alert(
       'Log out?',
-      'Your profile, bike setup and ride history will be cleared. (Cloud sync is not enabled yet.)',
+      "You'll need to sign in again.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Log out',
           style: 'destructive',
           onPress: async () => {
-            await clearProfile();
-            await clearHistory();
-            // Reset the in-memory profile so the next screen shows defaults
-            // immediately, not the cached old values.
-            await update(DEFAULT_PROFILE);
+            // The root gate redirects to the slides once signed out.
+            await signOut();
             toast.success('Logged out');
-            router.replace('/onboarding' as Href);
           },
         },
       ],
