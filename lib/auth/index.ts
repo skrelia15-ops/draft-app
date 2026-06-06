@@ -1,3 +1,3 @@
 export { AuthProvider, useAuth } from './AuthProvider';
-export { resolveRoute } from './gating';
-export type { Route, GateInput } from './gating';
+export { resolveRedirect } from './gating';
+export type { GateState, NavGroup, RedirectTarget } from './gating';

@@ -1,20 +1,115 @@
-import { resolveRoute } from './gating';
-import { DEFAULT_PROFILE } from '@/lib/profile';
+import { resolveRedirect, type GateState } from './gating';
 
-test('no session -> auth', () => {
-  expect(resolveRoute({ hasSession: false, profile: null })).toBe('/auth');
+const base: GateState = {
+  authLoading: false,
+  hasSession: false,
+  profileLoaded: false,
+  profileComplete: false,
+  group: undefined,
+  subgroup: undefined,
+};
+
+test('holds position while auth is loading', () => {
+  expect(resolveRedirect({ ...base, authLoading: true })).toBeNull();
 });
 
-test('session but no profile loaded yet -> null (wait)', () => {
-  expect(resolveRoute({ hasSession: true, profile: null })).toBeNull();
+test('holds position when signed in but profile not loaded yet', () => {
+  expect(
+    resolveRedirect({ ...base, hasSession: true, profileLoaded: false }),
+  ).toBeNull();
 });
 
-test('session + empty-name profile -> profile wizard', () => {
-  expect(resolveRoute({ hasSession: true, profile: { ...DEFAULT_PROFILE, name: '' } }))
-    .toBe('/onboarding/profile/basics');
+test('signed out at root -> slides', () => {
+  expect(resolveRedirect({ ...base, group: undefined })).toBe('/onboarding');
 });
 
-test('session + named profile -> tabs', () => {
-  expect(resolveRoute({ hasSession: true, profile: { ...DEFAULT_PROFILE, name: 'Sam' } }))
-    .toBe('/(tabs)');
+test('signed out on slides -> stay', () => {
+  expect(resolveRedirect({ ...base, group: 'onboarding' })).toBeNull();
+});
+
+test('signed out on auth -> stay', () => {
+  expect(resolveRedirect({ ...base, group: 'auth' })).toBeNull();
+});
+
+test('signed out on tabs -> slides', () => {
+  expect(resolveRedirect({ ...base, group: '(tabs)' })).toBe('/onboarding');
+});
+
+test('signed out cannot sit in the profile wizard -> slides', () => {
+  expect(
+    resolveRedirect({ ...base, group: 'onboarding', subgroup: 'profile' }),
+  ).toBe('/onboarding');
+});
+
+test('signed in, profile incomplete, not in wizard -> wizard', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: false,
+      group: '(tabs)',
+    }),
+  ).toBe('/onboarding/profile/basics');
+});
+
+test('signed in, profile incomplete, already in wizard -> stay', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: false,
+      group: 'onboarding',
+      subgroup: 'profile',
+    }),
+  ).toBeNull();
+});
+
+test('signed in + complete on auth -> tabs', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: true,
+      group: 'auth',
+    }),
+  ).toBe('/(tabs)');
+});
+
+test('signed in + complete on slides -> tabs', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: true,
+      group: 'onboarding',
+    }),
+  ).toBe('/(tabs)');
+});
+
+test('signed in + complete inside tabs -> stay', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: true,
+      group: '(tabs)',
+    }),
+  ).toBeNull();
+});
+
+test('signed in + complete on a ride screen -> stay', () => {
+  expect(
+    resolveRedirect({
+      ...base,
+      hasSession: true,
+      profileLoaded: true,
+      profileComplete: true,
+      group: 'ride',
+    }),
+  ).toBeNull();
 });
