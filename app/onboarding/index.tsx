@@ -205,12 +205,8 @@ export default function OnboardingSlidesScreen() {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
     } else {
-      router.push('/onboarding/profile-setup' as Href);
+      router.replace('/auth/choose' as Href);
     }
-  };
-
-  const handleSkip = () => {
-    router.replace('/(tabs)');
   };
 
   const currentSlide = slides[currentIndex];
@@ -229,19 +225,6 @@ export default function OnboardingSlidesScreen() {
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         renderItem={({ item }) => <SlideContent slide={item} width={width} />}
       />
-
-      <Pressable
-        onPress={handleSkip}
-        style={styles.skipHitArea}
-        hitSlop={12}
-      >
-        <Text
-          style={[styles.skipText, { color: theme.skipColor }]}
-          allowFontScaling={false}
-        >
-          Skip
-        </Text>
-      </Pressable>
 
       <View style={styles.dotsContainer} pointerEvents="none">
         <PageDots
@@ -304,16 +287,6 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.xl,
     lineHeight: Math.round(typography.size.xl * typography.lineHeight.normal),
-  },
-  skipHitArea: {
-    position: 'absolute',
-    top: 66,
-    right: spacing.lg,
-  },
-  skipText: {
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.md,
-    lineHeight: Math.round(typography.size.md * typography.lineHeight.normal),
   },
   dotsContainer: {
     position: 'absolute',
