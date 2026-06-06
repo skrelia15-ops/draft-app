@@ -1,5 +1,5 @@
 import { useAuth } from '@/lib/auth';
-import { useProfile } from '@/lib/profile';
+import { avatarSignedUrl, isDirectUri, useProfile } from '@/lib/profile';
 import {
     formatDistanceMeters,
     formatHourMin,
@@ -12,7 +12,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Bolt } from '@solar-icons/react-native/Bold';
 import { Bicycling, Logout3, Tuning } from '@solar-icons/react-native/Linear';
 import { Href, router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const TAB_BAR_SAFE_AREA = 110;
@@ -43,6 +43,26 @@ export default function ProfileScreen() {
   const compatibility = useMemo(() => getCompatibility(history), [history]);
   const { first, last } = splitName(profile.name);
   const bike = profile.bike;
+
+  // avatarUri may be a direct file://-or-http URI or a Supabase Storage
+  // path; resolve paths to a temporary signed URL for display.
+  const [avatarDisplayUri, setAvatarDisplayUri] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    const uri = profile.avatarUri;
+    if (!uri) {
+      setAvatarDisplayUri(null);
+    } else if (isDirectUri(uri)) {
+      setAvatarDisplayUri(uri);
+    } else {
+      avatarSignedUrl(uri).then((url) => {
+        if (active) setAvatarDisplayUri(url);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [profile.avatarUri]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -101,9 +121,9 @@ export default function ProfileScreen() {
       <View style={styles.headerRow}>
         <View style={styles.avatarWrap}>
           <View style={styles.avatarRing}>
-            {profile.avatarUri ? (
+            {avatarDisplayUri ? (
               <Image
-                source={{ uri: profile.avatarUri }}
+                source={{ uri: avatarDisplayUri }}
                 style={styles.avatarImage}
               />
             ) : (
@@ -131,7 +151,7 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.settingsButton}
           onPress={() =>
-            router.push('/onboarding/profile-setup?mode=edit' as Href)
+            router.push('/profile-setup?mode=edit' as Href)
           }
         >
           <Tuning size={20} color={colors.textOnDark} />
@@ -187,7 +207,7 @@ export default function ProfileScreen() {
         <Pressable
           style={styles.emptyCard}
           onPress={() =>
-            router.push('/onboarding/profile-setup?mode=edit' as Href)
+            router.push('/profile-setup?mode=edit' as Href)
           }
         >
           <Text style={styles.emptyText}>
