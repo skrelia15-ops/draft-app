@@ -6,3 +6,5 @@ export {
   WEEKLY_GOAL_MIN,
 } from './types';
 export type { Profile, Bike, SkillLevel, BikeType } from './types';
+export { rowToProfile, profileToRow } from './mappers';
+export type { ProfileRow, ProfileUpdate } from './mappers';
