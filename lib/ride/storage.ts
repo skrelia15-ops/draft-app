@@ -1,48 +1,41 @@
 /**
- * AsyncStorage-backed ride history persistence.
- *
- * We only keep the most recent N rides (and downsample their GPS traces
- * on save) so the JSON we store stays small and parse is fast.
+ * Ride history persistence, backed by the Supabase `rides` table.
+ * saveHistory upserts the full set the provider holds; loadHistory pulls
+ * the signed-in user's rides newest-first. Trace downsampling is retained
+ * to keep row size sane.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
 import { downsample, MAX_PERSISTED_SAMPLES } from './telemetry';
+import { rideToRow, rowToRide, type RideRow } from './mappers';
 import type { RideRecord } from './types';
 
-const KEY = 'draft.rides.v1';
-const MAX_RIDES = 12;
-
 export async function loadHistory(): Promise<RideRecord[]> {
-  try {
-    const raw = await AsyncStorage.getItem(KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as RideRecord[];
-    if (!Array.isArray(parsed)) return [];
-    // Sort newest-first to be defensive about pre-existing data.
-    return parsed.slice(-MAX_RIDES).sort((a, b) => b.endedAt - a.endedAt);
-  } catch (e) {
-    if (__DEV__) console.warn('[ride/storage] loadHistory failed', e);
-    return [];
-  }
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return [];
+  const { data, error } = await supabase
+    .from('rides').select('*').eq('user_id', uid).order('ended_at', { ascending: false });
+  if (error || !data) return [];
+  return (data as unknown as RideRow[]).map(rowToRide);
 }
 
 export async function saveHistory(history: RideRecord[]): Promise<void> {
-  try {
-    const trimmed = history
-      .slice(0, MAX_RIDES)
-      .map((r) => ({
-        ...r,
-        samples: downsample(r.samples, MAX_PERSISTED_SAMPLES),
-      }));
-    await AsyncStorage.setItem(KEY, JSON.stringify(trimmed));
-  } catch (e) {
-    if (__DEV__) console.warn('[ride/storage] saveHistory failed', e);
-  }
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return;
+  const rows = history.map((r) =>
+    rideToRow({ ...r, samples: downsample(r.samples, MAX_PERSISTED_SAMPLES) }, uid),
+  );
+  // rideToRow returns RideRow with typed samples/segments/origin/destination
+  // (RideSample[], RideSegment[], LatLng | null) which are narrower than the
+  // generated Insert type's Json fields. Cast to `never` to bridge the gap.
+  const { error } = await supabase.from('rides').upsert(rows as never[], { onConflict: 'id' });
+  if (error && __DEV__) console.warn('[ride/storage] saveHistory failed', error);
 }
 
 export async function clearHistory(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(KEY);
-  } catch (e) {
-    if (__DEV__) console.warn('[ride/storage] clearHistory failed', e);
-  }
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id;
+  if (!uid) return;
+  await supabase.from('rides').delete().eq('user_id', uid);
 }

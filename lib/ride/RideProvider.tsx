@@ -377,7 +377,7 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
     setPhase('finished');
     setLastFinished(record);
     setHistory((prev) => {
-      const next = [record, ...prev].slice(0, 12);
+      const next = [record, ...prev];
       saveHistory(next);
       return next;
     });
