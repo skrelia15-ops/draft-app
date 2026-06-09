@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 import { RideProvider } from '@/lib/ride';
 import { ProfileProvider, useProfile } from '@/lib/profile';
+import { RoutesProvider } from '@/lib/routes';
 import { AuthProvider, useAuth, resolveRedirect } from '@/lib/auth';
 import { toastConfig } from '@/components/ui/draft/toast-config';
 
@@ -85,9 +86,11 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <ProfileProvider>
-        <RideProvider>
-          <RootNavigator />
-        </RideProvider>
+        <RoutesProvider>
+          <RideProvider>
+            <RootNavigator />
+          </RideProvider>
+        </RoutesProvider>
       </ProfileProvider>
     </AuthProvider>
   );

@@ -15,9 +15,9 @@ import { darkMapStyle, type LatLng } from '@/lib/maps';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { buildRoutePreview } from '@/lib/ride';
 import {
-  ROUTE_CATALOG,
   hashIdSeed,
   shapeLabel,
+  useRoutes,
   type CatalogRoute,
 } from '@/lib/routes';
 import {
@@ -120,6 +120,7 @@ function RouteCardBody({ route, featured }: { route: ExploreRoute; featured?: bo
 }
 
 export default function ExploreScreen() {
+  const { routes: catalog } = useRoutes();
   const { coords } = useUserLocation();
   const [activeFilter, setActiveFilter] = useState<ExploreFilter>('ALL');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -135,14 +136,14 @@ export default function ExploreScreen() {
   const filteredRoutes = useMemo(() => {
     const trimmed = searchQuery.trim().toLowerCase();
     if (trimmed) {
-      return ROUTE_CATALOG.filter((r) => r.name.toLowerCase().includes(trimmed));
+      return catalog.filter((r) => r.name.toLowerCase().includes(trimmed));
     }
-    return filterRoutes(ROUTE_CATALOG, activeFilter);
-  }, [activeFilter, searchQuery]);
+    return filterRoutes(catalog, activeFilter);
+  }, [catalog, activeFilter, searchQuery]);
 
   const previewById = useMemo(() => {
     const map = new Map<string, ReturnType<typeof buildRoutePreview>>();
-    for (const route of ROUTE_CATALOG) {
+    for (const route of catalog) {
       map.set(
         route.id,
         buildRoutePreview({
@@ -154,7 +155,7 @@ export default function ExploreScreen() {
       );
     }
     return map;
-  }, [origin]);
+  }, [catalog, origin]);
 
   const handleToggleSearch = () => {
     setSearchOpen((open) => {

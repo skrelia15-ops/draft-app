@@ -6,11 +6,11 @@ import {
     useRide,
 } from '@/lib/ride';
 import {
-    findRoute,
     hashIdSeed,
     shapeLabel,
     trafficColor,
     trafficLabel,
+    useRoutes,
 } from '@/lib/routes';
 import { toast } from '@/lib/toast';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -44,23 +44,28 @@ export default function RouteDetailsScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { coords } = useUserLocation();
   const { startRide } = useRide();
+  const { findRoute } = useRoutes();
 
-  const route = useMemo(() => findRoute(params.id), [params.id]);
+  const route = findRoute(params.id);
   const origin = coords ?? MANHATTAN;
+
   const conditions = useMemo(() => getCurrentConditions(), []);
 
   const preview = useMemo(
     () =>
-      buildRoutePreview({
-        origin,
-        shape: route.shape,
-        distanceKm: route.distanceKm,
-        seed: hashIdSeed(route.id),
-      }),
+      route
+        ? buildRoutePreview({
+            origin,
+            shape: route.shape,
+            distanceKm: route.distanceKm,
+            seed: hashIdSeed(route.id),
+          })
+        : null,
     [origin, route],
   );
 
   const region = useMemo(() => {
+    if (!preview) return null;
     const lats = preview.coordinates.map((c) => c.latitude);
     const lngs = preview.coordinates.map((c) => c.longitude);
     const minLat = Math.min(...lats);
@@ -74,6 +79,9 @@ export default function RouteDetailsScreen() {
       longitudeDelta: Math.max(0.005, (maxLng - minLng) * 1.4),
     };
   }, [preview]);
+
+  // Catalog still loading or unknown id — render nothing rather than crash.
+  if (!route || !preview || !region) return null;
 
   const estDurationMin = Math.round((route.distanceKm / route.paceKmh) * 60);
 
