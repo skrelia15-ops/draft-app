@@ -5,6 +5,7 @@
  * downsampling is retained to keep row size sane.
  */
 import { supabase } from '@/lib/supabase';
+import type { Json, TablesInsert } from '@/lib/supabase/database.types';
 import { downsample, MAX_PERSISTED_SAMPLES } from './telemetry';
 import { rideToRow, rowToRide, type RideRow } from './mappers';
 import type { RideRecord } from './types';
@@ -36,10 +37,17 @@ export async function saveRide(record: RideRecord): Promise<boolean> {
     { ...record, samples: downsample(record.samples, MAX_PERSISTED_SAMPLES) },
     uid,
   );
-  // rideToRow returns RideRow with typed samples/segments/origin/destination
-  // (RideSample[], RideSegment[], LatLng | null) which are narrower than the
-  // generated Insert type's Json fields. Cast to `never` to bridge the gap.
-  const { error } = await supabase.from('rides').upsert(row as never, { onConflict: 'id' });
+  // Every scalar column stays type-checked against the generated Insert
+  // type; only the jsonb columns (typed `Json` in the schema, but concrete
+  // domain types here) need a cast at this serialization boundary.
+  const insert: TablesInsert<'rides'> = {
+    ...row,
+    samples: row.samples as unknown as Json,
+    segments: row.segments as unknown as Json,
+    origin: row.origin as unknown as Json,
+    destination: row.destination as unknown as Json,
+  };
+  const { error } = await supabase.from('rides').upsert(insert, { onConflict: 'id' });
   if (error) {
     console.warn('[ride/storage] saveRide failed', error);
     return false;

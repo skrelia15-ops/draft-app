@@ -5,6 +5,7 @@
  * version so callers don't need to change.
  */
 import { supabase } from '@/lib/supabase';
+import type { Json, TablesUpdate } from '@/lib/supabase/database.types';
 import { rowToProfile, profileToRow, type ProfileRow } from './mappers';
 import { DEFAULT_PROFILE, type Profile } from './types';
 
@@ -25,13 +26,16 @@ export async function saveProfile(profile: Profile): Promise<boolean> {
     console.warn('[profile/storage] saveProfile skipped: no signed-in user');
     return false;
   }
-  // profileToRow returns ProfileUpdate (Bike | null for bike) which is
-  // narrower than the generated Update type's Json | null. Cast to `never`
-  // to satisfy the overloaded .update() signature while keeping our logic.
-  const { error } = await supabase
-    .from('profiles')
-    .update({ ...profileToRow(profile), updated_at: new Date().toISOString() } as never)
-    .eq('id', uid);
+  // Every scalar column stays type-checked against the generated Update
+  // type; only the jsonb `bike` column (typed `Json` in the schema, but the
+  // concrete `Bike` domain type here) needs a cast at this boundary.
+  const row = profileToRow(profile);
+  const payload: TablesUpdate<'profiles'> = {
+    ...row,
+    bike: row.bike as unknown as Json,
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await supabase.from('profiles').update(payload).eq('id', uid);
   if (error) {
     console.warn('[profile/storage] saveProfile failed', error);
     return false;
