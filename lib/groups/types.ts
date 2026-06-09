@@ -43,3 +43,14 @@ export function trainTypeLabel(type: TrainType): string {
   if (type === 'STEADY') return 'Steady';
   return 'Tempo';
 }
+
+export function formatRideWhen(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

@@ -5,20 +5,9 @@ import { Href, router, useFocusEffect } from 'expo-router';
 import { ChevronRight, Plus, Users } from 'lucide-react-native';
 import { ElevatedCard } from '@/components/ui/draft';
 import { colors, radius, spacing, typography } from '@/theme';
-import { useGroups, trainTypeLabel, type Group, type GroupRide } from '@/lib/groups';
+import { useGroups, trainTypeLabel, formatRideWhen, type Group, type GroupRide } from '@/lib/groups';
 
 const TAB_BAR_SAFE_AREA = 110;
-
-function formatRideWhen(ms: number): string {
-  const d = new Date(ms);
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 function GroupStatsRow({ group }: { group: Group }) {
   return (

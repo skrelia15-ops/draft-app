@@ -13,6 +13,7 @@ import {
   leaveGroup,
   deleteGroup,
   trainTypeLabel,
+  formatRideWhen,
   useGroups,
   type Group,
   type GroupMember,
@@ -20,16 +21,6 @@ import {
 } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
-
-function formatRideWhen(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -99,9 +90,11 @@ export default function GroupDetailScreen() {
       </Text>
       {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
 
-      <PrimaryButton onPress={onJoinLeave} disabled={busy}>
-        {busy ? '…' : group.isMember ? 'Leave group' : 'Join group'}
-      </PrimaryButton>
+      {!isOwner ? (
+        <PrimaryButton onPress={onJoinLeave} disabled={busy}>
+          {busy ? '…' : group.isMember ? 'Leave group' : 'Join group'}
+        </PrimaryButton>
+      ) : null}
 
       {group.isMember ? (
         <SecondaryButton

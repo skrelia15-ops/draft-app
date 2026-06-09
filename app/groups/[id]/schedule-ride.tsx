@@ -43,7 +43,7 @@ export default function ScheduleRideScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.header}>SCHEDULE RIDE</Text>
 
       <InputField
