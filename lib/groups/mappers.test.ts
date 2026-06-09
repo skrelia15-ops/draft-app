@@ -1,10 +1,8 @@
 // lib/groups/mappers.test.ts
 import {
   rowToGroup,
-  rowToGroupMember,
   rowToGroupRide,
   type GroupRow,
-  type GroupMemberRow,
   type GroupRideRow,
 } from './mappers';
 
@@ -36,27 +34,6 @@ describe('rowToGroup', () => {
 
   it('defaults member_count to 0 when the view returns null', () => {
     expect(rowToGroup({ ...ROW, member_count: null }, false).memberCount).toBe(0);
-  });
-});
-
-describe('rowToGroupMember', () => {
-  it('flattens the joined profile and falls back to a placeholder name', () => {
-    const row: GroupMemberRow = {
-      group_id: 'g1',
-      user_id: 'u2',
-      role: 'member',
-      joined_at: '2026-06-09T00:00:00Z',
-      profiles: { name: 'Lena', avatar_url: 'http://x/a.png' },
-    };
-    expect(rowToGroupMember(row)).toEqual({
-      groupId: 'g1',
-      userId: 'u2',
-      role: 'member',
-      joinedAt: Date.parse('2026-06-09T00:00:00Z'),
-      name: 'Lena',
-      avatarUri: 'http://x/a.png',
-    });
-    expect(rowToGroupMember({ ...row, profiles: null }).name).toBe('Rider');
   });
 });
 

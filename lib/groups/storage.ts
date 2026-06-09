@@ -2,13 +2,11 @@
 import { supabase } from '@/lib/supabase';
 import {
   rowToGroup,
-  rowToGroupMember,
   rowToGroupRide,
   type GroupRow,
-  type GroupMemberRow,
   type GroupRideRow,
 } from './mappers';
-import type { Group, GroupMember, GroupRide, TrainType } from './types';
+import type { Group, GroupRide, TrainType } from './types';
 
 async function currentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
@@ -66,19 +64,6 @@ export async function getGroup(id: string): Promise<Group | null> {
     .single();
   if (error || !data) return null;
   return rowToGroup(data as unknown as GroupRow, ids.has(id));
-}
-
-export async function listMembers(groupId: string): Promise<GroupMember[]> {
-  const { data, error } = await supabase
-    .from('group_members')
-    .select('group_id, user_id, role, joined_at, profiles(name, avatar_url)')
-    .eq('group_id', groupId)
-    .order('joined_at', { ascending: true });
-  if (error || !data) {
-    console.warn('[groups/storage] listMembers failed', error);
-    return [];
-  }
-  return (data as unknown as GroupMemberRow[]).map(rowToGroupMember);
 }
 
 export async function createGroup(input: {

@@ -1,11 +1,10 @@
 // lib/groups/index.ts
-export type { Group, GroupMember, GroupRide, TrainType, MemberRole } from './types';
+export type { Group, GroupRide, TrainType, MemberRole } from './types';
 export { trainTypeLabel, formatRideWhen } from './types';
 export {
   listMyGroups,
   listDiscoverGroups,
   getGroup,
-  listMembers,
   createGroup,
   updateGroup,
   deleteGroup,

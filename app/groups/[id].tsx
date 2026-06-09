@@ -7,7 +7,6 @@ import { PrimaryButton, SecondaryButton } from '@/components/ui/draft';
 import { colors, spacing, typography } from '@/theme';
 import {
   getGroup,
-  listMembers,
   listGroupRides,
   joinGroup,
   leaveGroup,
@@ -16,7 +15,6 @@ import {
   formatRideWhen,
   useGroups,
   type Group,
-  type GroupMember,
   type GroupRide,
 } from '@/lib/groups';
 import { supabase } from '@/lib/supabase';
@@ -26,21 +24,18 @@ export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refresh } = useGroups();
   const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<GroupMember[]>([]);
   const [rides, setRides] = useState<GroupRide[]>([]);
   const [uid, setUid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [g, m, r, auth] = await Promise.all([
+    const [g, r, auth] = await Promise.all([
       getGroup(id),
-      listMembers(id),
       listGroupRides(id),
       supabase.auth.getUser(),
     ]);
     setGroup(g);
-    setMembers(m);
     setRides(r);
     setUid(auth.data.user?.id ?? null);
   }, [id]);
@@ -119,14 +114,6 @@ export default function GroupDetailScreen() {
         ))
       )}
 
-      <Text style={styles.sectionTitle}>MEMBERS</Text>
-      {members.map((member) => (
-        <View key={member.userId} style={styles.row}>
-          <Text style={styles.rowTitle}>{member.name}</Text>
-          {member.role === 'owner' ? <Text style={styles.ownerTag}>OWNER</Text> : null}
-        </View>
-      ))}
-
       {isOwner ? (
         <View style={styles.ownerActions}>
           <SecondaryButton onPress={onDelete} disabled={busy}>
@@ -180,12 +167,6 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.sm,
-  },
-  ownerTag: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
   },
   ownerActions: { marginTop: spacing.xl },
 });

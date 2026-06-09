@@ -1,5 +1,5 @@
 // lib/groups/mappers.ts
-import type { Group, GroupMember, GroupRide, MemberRole, TrainType } from './types';
+import type { Group, GroupRide, TrainType } from './types';
 
 function parseTs(value: string | null | undefined): number {
   if (!value) return 0;
@@ -29,25 +29,6 @@ export function rowToGroup(row: GroupRow, isMember: boolean): Group {
     memberCount: row.member_count ?? 0,
     isMember,
     createdAt: parseTs(row.created_at),
-  };
-}
-
-export type GroupMemberRow = {
-  group_id: string;
-  user_id: string;
-  role: MemberRole;
-  joined_at: string;
-  profiles: { name: string; avatar_url: string | null } | null;
-};
-
-export function rowToGroupMember(row: GroupMemberRow): GroupMember {
-  return {
-    groupId: row.group_id,
-    userId: row.user_id,
-    role: row.role,
-    joinedAt: parseTs(row.joined_at),
-    name: row.profiles?.name || 'Rider',
-    avatarUri: row.profiles?.avatar_url ?? null,
   };
 }
 

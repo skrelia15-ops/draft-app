@@ -16,16 +16,6 @@ export type Group = {
   createdAt: number;
 };
 
-export type GroupMember = {
-  groupId: string;
-  userId: string;
-  role: MemberRole;
-  joinedAt: number;
-  /** Joined from profiles for display. */
-  name: string;
-  avatarUri: string | null;
-};
-
 export type GroupRide = {
   id: string;
   groupId: string;
