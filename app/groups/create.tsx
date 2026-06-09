@@ -1,7 +1,7 @@
 // app/groups/create.tsx
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { Href, router } from 'expo-router';
 import {
   InputField,
   PrimaryButton,
@@ -40,7 +40,7 @@ export default function CreateGroupScreen() {
       return;
     }
     await refresh();
-    router.replace(`/groups/${group.id}`);
+    router.replace(`/groups/${group.id}` as Href);
   };
 
   return (
