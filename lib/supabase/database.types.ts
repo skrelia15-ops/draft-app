@@ -14,6 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
+      group_members: {
+        Row: {
+          group_id: string
+          joined_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          joined_at?: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          joined_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups_with_counts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_rides: {
+        Row: {
+          created_at: string
+          created_by: string
+          group_id: string
+          id: string
+          route_id: string | null
+          scheduled_at: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          group_id: string
+          id?: string
+          route_id?: string | null
+          scheduled_at: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          group_id?: string
+          id?: string
+          route_id?: string | null
+          scheduled_at?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_rides_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_rides_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups_with_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_rides_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          pace_kmh: number
+          train_type: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          pace_kmh: number
+          train_type: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          pace_kmh?: number
+          train_type?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -110,12 +228,66 @@ export type Database = {
         }
         Relationships: []
       }
+      routes: {
+        Row: {
+          created_at: string
+          difficulty: string
+          distance_km: number
+          draft_percent: number
+          id: string
+          name: string
+          note: string | null
+          pace_kmh: number
+          riders: number
+          shape: string
+          traffic: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty: string
+          distance_km: number
+          draft_percent: number
+          id: string
+          name: string
+          note?: string | null
+          pace_kmh: number
+          riders?: number
+          shape: string
+          traffic: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string
+          distance_km?: number
+          draft_percent?: number
+          id?: string
+          name?: string
+          note?: string | null
+          pace_kmh?: number
+          riders?: number
+          shape?: string
+          traffic?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      groups_with_counts: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string | null
+          member_count: number | null
+          name: string | null
+          owner_id: string | null
+          pace_kmh: number | null
+          train_type: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      is_group_member: { Args: { gid: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
