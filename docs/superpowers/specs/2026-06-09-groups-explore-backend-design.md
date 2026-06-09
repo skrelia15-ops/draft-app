@@ -123,7 +123,9 @@ of the group (or the group owner).
   states.
 - **`app/groups/[id].tsx`** — group detail: header (name, pace, train type,
   member count), member list, this group's UPCOMING RIDES, Join/Leave button.
-  Members see "Schedule ride"; the owner sees Edit / Delete.
+  Members see "Schedule ride"; the owner sees Delete. (Owner **Edit** is
+  deferred to a later iteration — `updateGroup` storage exists and is ready,
+  but no Edit form ships this iteration.)
 - **`app/groups/create.tsx`** — create form (name, description, pace_kmh,
   train_type). On submit: create the group and add the owner as a
   `group_members` row, then redirect to the detail screen.
