@@ -1,111 +1,56 @@
+// app/(tabs)/groups.tsx
+import { useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Href, router, useFocusEffect } from 'expo-router';
+import { ChevronRight, Plus, Users } from 'lucide-react-native';
 import { ElevatedCard } from '@/components/ui/draft';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Href, router } from 'expo-router';
-import { ChevronRight, Users } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useGroups, trainTypeLabel, type Group, type GroupRide } from '@/lib/groups';
 
 const TAB_BAR_SAFE_AREA = 110;
 
-type TrainType = 'ROTATING' | 'STEADY' | 'TEMPO';
-
-type LiveTrain = {
-  id: string;
-  name: string;
-  riders: number;
-  paceKmh: number;
-  trainType: TrainType;
-  /** Rough cardinal heading the train is rolling. */
-  heading: string;
-};
-
-type Group = {
-  id: string;
-  name: string;
-  riders: number;
-  paceKmh: number;
-  trainType: TrainType;
-};
-
-const LIVE_TRAINS: LiveTrain[] = [
-  {
-    id: 'morning-express',
-    name: 'MORNING EXPRESS',
-    riders: 12,
-    paceKmh: 34,
-    trainType: 'ROTATING',
-    heading: 'NW · 4.2 km away',
-  },
-  {
-    id: 'coastal-cruise',
-    name: 'COASTAL CRUISE',
-    riders: 8,
-    paceKmh: 28,
-    trainType: 'STEADY',
-    heading: 'S · 1.8 km away',
-  },
-];
-
-const SUGGESTED_GROUPS: Group[] = [
-  {
-    id: 'weekend-warriors',
-    name: 'WEEKEND WARRIORS',
-    riders: 45,
-    paceKmh: 30,
-    trainType: 'TEMPO',
-  },
-  {
-    id: 'dawn-patrol',
-    name: 'DAWN PATROL',
-    riders: 22,
-    paceKmh: 32,
-    trainType: 'ROTATING',
-  },
-];
-
-function trainTypeLabel(type: TrainType): string {
-  if (type === 'ROTATING') return 'Rotating';
-  if (type === 'STEADY') return 'Steady';
-  return 'Tempo';
+function formatRideWhen(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-function GroupStatsRow({
-  paceKmh,
-  riders,
-  trainType,
-}: {
-  paceKmh: number;
-  riders: number;
-  trainType: TrainType;
-}) {
+function GroupStatsRow({ group }: { group: Group }) {
   return (
     <View style={styles.statsRow}>
       <View style={styles.statBlock}>
         <Text style={styles.statLabel}>PACE</Text>
-        <Text style={styles.statValue}>{paceKmh} km/h</Text>
+        <Text style={styles.statValue}>{group.paceKmh} km/h</Text>
       </View>
       <View style={styles.statBlock}>
         <Text style={styles.statLabel}>RIDERS</Text>
-        <Text style={styles.statValue}>{riders}</Text>
+        <Text style={styles.statValue}>{group.memberCount}</Text>
       </View>
       <View style={styles.statBlock}>
         <Text style={styles.statLabel}>TYPE</Text>
-        <Text style={styles.statValue}>{trainTypeLabel(trainType)}</Text>
+        <Text style={styles.statValue}>{trainTypeLabel(group.trainType)}</Text>
       </View>
     </View>
   );
 }
 
-/**
- * Groups screen — restructured to:
- *   1. LIVE TRAINS — highlighted as cards (the only "special" content)
- *   2. SUGGESTED GROUPS — divider-separated list rows, no card chrome
- *
- * The previous yellow "Match score" hero card lived here even though
- * the score is fundamentally a Profile concept. It's been removed —
- * compatibility now stays on Home / Profile, and Groups focuses on
- * groups.
- */
 export default function GroupsScreen() {
+  const { myGroups, discoverGroups, upcomingRides, refresh } = useGroups();
+
+  // Re-pull whenever the tab regains focus (after create/join/leave/schedule).
+  useFocusEffect(
+    useCallback(() => {
+      refresh().catch(() => {});
+    }, [refresh]),
+  );
+
+  const openGroup = (id: string) => router.push(`/groups/${id}` as Href);
+
   return (
     <ScrollView
       style={styles.container}
@@ -117,90 +62,91 @@ export default function GroupsScreen() {
           <Text style={styles.header}>GROUPS</Text>
           <Text style={styles.headerSub}>Your riding community</Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Create group"
+          onPress={() => router.push('/groups/create' as Href)}
+          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+        >
+          <Plus size={20} color={colors.textOnDark} />
+        </Pressable>
       </View>
 
-      {/* LIVE TRAINS — cards because the LIVE state is the page's
-          only true "hero" content. */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>LIVE TRAINS</Text>
-        <View style={styles.liveCount}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveCountText}>{LIVE_TRAINS.length} now</Text>
-        </View>
-      </View>
-
-      {LIVE_TRAINS.length === 0 ? (
-        <ElevatedCard style={styles.emptyTrainCard}>
-          <Text style={styles.emptyTrainTitle}>No trains rolling right now</Text>
-          <Text style={styles.emptyTrainBody}>
-            Start a ride to broadcast your route — others nearby can hop on.
+      {/* MY GROUPS */}
+      <Text style={styles.sectionTitle}>MY GROUPS</Text>
+      {myGroups.length === 0 ? (
+        <ElevatedCard style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>{"You haven't joined any groups yet"}</Text>
+          <Text style={styles.emptyBody}>
+            Join one from Discover below, or create your own.
           </Text>
         </ElevatedCard>
       ) : (
-        LIVE_TRAINS.map((train) => (
-          <ElevatedCard
-            key={train.id}
-            style={styles.trainCard}
-            onPress={() => router.push('/ride/route-details' as Href)}
-          >
-            <View style={styles.trainCardHeader}>
-              <View style={styles.trainBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.trainBadgeText}>LIVE</Text>
-              </View>
-              <Text style={styles.trainHeading}>{train.heading}</Text>
-            </View>
-            <Text style={styles.trainName}>{train.name}</Text>
-            <GroupStatsRow
-              paceKmh={train.paceKmh}
-              riders={train.riders}
-              trainType={train.trainType}
-            />
+        myGroups.map((group) => (
+          <ElevatedCard key={group.id} style={styles.trainCard} onPress={() => openGroup(group.id)}>
+            <Text style={styles.trainName}>{group.name}</Text>
+            <GroupStatsRow group={group} />
           </ElevatedCard>
         ))
       )}
 
-      {/* SUGGESTED GROUPS — divider list, no cards. The section header
-          + hairline between rows is enough hierarchy. */}
-      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>
-        SUGGESTED FOR YOU
-      </Text>
-      <Text style={styles.sectionHint}>Based on your pace and history</Text>
-
-      <View style={styles.groupList}>
-        {SUGGESTED_GROUPS.map((group) => (
+      {/* UPCOMING RIDES */}
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>UPCOMING RIDES</Text>
+      {upcomingRides.length === 0 ? (
+        <Text style={styles.sectionHint}>No rides scheduled in your groups yet.</Text>
+      ) : (
+        upcomingRides.map((ride: GroupRide) => (
           <Pressable
-            key={group.id}
+            key={ride.id}
             accessibilityRole="button"
-            onPress={() => router.push('/ride/route-details' as Href)}
-            style={({ pressed }) => [
-              styles.groupRow,
-              pressed && styles.groupRowPressed,
-            ]}
+            onPress={() => openGroup(ride.groupId)}
+            style={({ pressed }) => [styles.groupRow, pressed && styles.groupRowPressed]}
           >
-            <View style={styles.groupIcon}>
-              <Users size={20} color={colors.textOnDark} />
-            </View>
             <View style={styles.groupBody}>
-              <Text style={styles.groupName}>{group.name}</Text>
+              <Text style={styles.groupName}>{ride.title}</Text>
               <Text style={styles.groupMeta}>
-                {group.riders} riders · {group.paceKmh} km/h ·{' '}
-                {trainTypeLabel(group.trainType)}
+                {ride.groupName} · {formatRideWhen(ride.scheduledAt)}
               </Text>
             </View>
             <ChevronRight size={18} color={colors.textMuted} />
           </Pressable>
-        ))}
+        ))
+      )}
+
+      {/* DISCOVER */}
+      <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>DISCOVER</Text>
+      <Text style={styles.sectionHint}>Groups you can join</Text>
+      <View style={styles.groupList}>
+        {discoverGroups.length === 0 ? (
+          <Text style={styles.sectionHint}>Nothing new to discover right now.</Text>
+        ) : (
+          discoverGroups.map((group) => (
+            <Pressable
+              key={group.id}
+              accessibilityRole="button"
+              onPress={() => openGroup(group.id)}
+              style={({ pressed }) => [styles.groupRow, pressed && styles.groupRowPressed]}
+            >
+              <View style={styles.groupIcon}>
+                <Users size={20} color={colors.textOnDark} />
+              </View>
+              <View style={styles.groupBody}>
+                <Text style={styles.groupName}>{group.name}</Text>
+                <Text style={styles.groupMeta}>
+                  {group.memberCount} riders · {group.paceKmh} km/h · {trainTypeLabel(group.trainType)}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.textMuted} />
+            </Pressable>
+          ))
+        )}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing['4xl'],
@@ -225,22 +171,23 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     marginTop: spacing['3xs'],
   },
-  sectionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    justifyContent: 'center',
   },
+  addButtonPressed: { opacity: 0.85 },
   sectionTitle: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wider,
+    marginBottom: spacing.sm,
   },
-  sectionTitleSpaced: {
-    marginTop: spacing['2xl'],
-    marginBottom: spacing['2xs'],
-  },
+  sectionTitleSpaced: { marginTop: spacing['2xl'] },
   sectionHint: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.medium,
@@ -248,52 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     opacity: 0.7,
   },
-  // Status pill — dot + label, no outline (matches Home riders list).
-  liveCount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: '#3FBF6E',
-  },
-  liveCountText: {
-    color: '#3FBF6E',
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-  trainCard: {
-    marginBottom: spacing.sm,
-  },
-  trainCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  trainBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing['2xs'],
-  },
-  trainBadgeText: {
-    color: '#3FBF6E',
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-  },
-  trainHeading: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
+  trainCard: { marginBottom: spacing.sm },
   trainName: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
@@ -301,28 +203,21 @@ const styles = StyleSheet.create({
     fontSize: typography.size.base,
     marginBottom: spacing.sm,
   },
-  emptyTrainCard: {
-    marginBottom: spacing.sm,
-  },
-  emptyTrainTitle: {
+  emptyCard: { marginBottom: spacing.sm },
+  emptyTitle: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.sm,
     marginBottom: spacing['2xs'],
   },
-  emptyTrainBody: {
+  emptyBody: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.xs,
     lineHeight: typography.size.xs * typography.lineHeight.normal,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  statBlock: {
-    flex: 1,
-  },
+  statsRow: { flexDirection: 'row', gap: spacing.md },
+  statBlock: { flex: 1 },
   statLabel: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.semibold,
@@ -336,11 +231,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.sm,
   },
-  // Suggested groups — flat divider list. Each row is just the icon +
-  // text + chevron with a hairline rule between them.
-  groupList: {
-    // No background or border-radius; rows draw their own dividers.
-  },
+  groupList: {},
   groupRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -349,9 +240,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.inactiveOnDark,
   },
-  groupRowPressed: {
-    opacity: 0.85,
-  },
+  groupRowPressed: { opacity: 0.85 },
   groupIcon: {
     width: 40,
     height: 40,
@@ -360,9 +249,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupBody: {
-    flex: 1,
-  },
+  groupBody: { flex: 1 },
   groupName: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,
