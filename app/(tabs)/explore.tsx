@@ -120,7 +120,7 @@ function RouteCardBody({ route, featured }: { route: ExploreRoute; featured?: bo
 }
 
 export default function ExploreScreen() {
-  const { routes: catalog } = useRoutes();
+  const { routes: catalog, isHydrated } = useRoutes();
   const { coords } = useUserLocation();
   const [activeFilter, setActiveFilter] = useState<ExploreFilter>('ALL');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -250,16 +250,22 @@ export default function ExploreScreen() {
       )}
 
       {filteredRoutes.length === 0 ? (
-        <PrimaryCard style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>
-            {searchQuery.trim() ? 'No routes match your search' : 'No routes match this filter'}
-          </Text>
-          <Text style={styles.emptyBody}>
-            {searchQuery.trim()
-              ? 'Try a shorter or different name.'
-              : 'Try another tab to see more options nearby.'}
-          </Text>
-        </PrimaryCard>
+        // Suppress the false-empty state while the catalog is still loading.
+        // Only show the empty card once hydrated, or when the user is
+        // actively searching (search over a hydrating catalog is fine to
+        // show as no-results, but in practice hydration completes first).
+        (!isHydrated && !searchQuery.trim()) ? null : (
+          <PrimaryCard style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>
+              {searchQuery.trim() ? 'No routes match your search' : 'No routes match this filter'}
+            </Text>
+            <Text style={styles.emptyBody}>
+              {searchQuery.trim()
+                ? 'Try a shorter or different name.'
+                : 'Try another tab to see more options nearby.'}
+            </Text>
+          </PrimaryCard>
+        )
       ) : (
         filteredRoutes.map((route) => {
           const preview = previewById.get(route.id)!;
