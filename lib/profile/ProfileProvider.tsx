@@ -43,29 +43,44 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       lastUid = uid;
       setIsHydrated(false);
       setProfile(DEFAULT_PROFILE);
-      loadProfile().then((p) => {
-        setProfile(p);
-        setIsHydrated(true);
-      });
+      loadProfile()
+        .then((p) => {
+          setProfile(p);
+          setIsHydrated(true);
+        })
+        .catch((e) => {
+          // Don't strand the app on the splash if the load rejects (offline,
+          // Supabase down). Mark hydrated so the nav gate can proceed; the
+          // user falls back to DEFAULT_PROFILE and can retry by reloading.
+          console.warn('[ProfileProvider] loadProfile failed', e);
+          setIsHydrated(true);
+        });
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   const update = useCallback(
     async (patch: Partial<Profile>): Promise<Profile> => {
-      const next: Profile = {
-        ...profile,
-        ...patch,
-        bike: patch.bike
-          ? { ...(profile.bike ?? DEFAULT_PROFILE.bike!), ...patch.bike }
-          : profile.bike,
-        updatedAt: Date.now(),
-      };
-      setProfile(next);
+      // Derive the next profile from the freshest state via the functional
+      // updater, so two rapid update() calls (e.g. an avatar upload landing
+      // while the user edits their name) don't both read the same stale
+      // `profile` and clobber each other (last-write-wins data loss).
+      let next!: Profile;
+      setProfile((current) => {
+        next = {
+          ...current,
+          ...patch,
+          bike: patch.bike
+            ? { ...(current.bike ?? DEFAULT_PROFILE.bike!), ...patch.bike }
+            : current.bike,
+          updatedAt: Date.now(),
+        };
+        return next;
+      });
       await saveProfile(next);
       return next;
     },
-    [profile],
+    [],
   );
 
   const value = useMemo(

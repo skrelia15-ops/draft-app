@@ -95,6 +95,9 @@ export function useUserLocation(): UseUserLocationResult {
           timeInterval: 4_000,
         },
         (update) => {
+          // A queued fix can still fire after unmount/retry (subscription
+          // removal is async) — guard against setState-after-unmount.
+          if (cancelledRef.current) return;
           setCoords({
             latitude: update.coords.latitude,
             longitude: update.coords.longitude,

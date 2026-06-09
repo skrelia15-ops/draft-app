@@ -28,6 +28,11 @@ test('rowToProfile handles null bike', () => {
   expect(rowToProfile({ ...row, bike: null }).bike).toBeNull();
 });
 
+test('rowToProfile falls back to 0 for null/garbage updated_at (no NaN)', () => {
+  expect(rowToProfile({ ...row, updated_at: null as never }).updatedAt).toBe(0);
+  expect(rowToProfile({ ...row, updated_at: 'not-a-date' }).updatedAt).toBe(0);
+});
+
 test('profileToRow maps Profile to an update payload (no id/updated_at)', () => {
   const payload = profileToRow({ ...DEFAULT_PROFILE, id: 'user-1', name: 'A' });
   expect(payload).toEqual({

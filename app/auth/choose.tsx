@@ -4,16 +4,41 @@ import { toast } from '@/lib/toast';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
+import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+/**
+ * True when the error is the user dismissing the native Apple/Google sheet
+ * rather than a real failure — these must NOT surface as an error toast.
+ * Apple throws `ERR_REQUEST_CANCELED`; Google throws `SIGN_IN_CANCELLED`
+ * (and `-5` / `12501` on some platform/version combos).
+ */
+function isCancellation(e: any): boolean {
+  const code = String(e?.code ?? '');
+  return (
+    code === 'ERR_REQUEST_CANCELED' ||
+    code === 'SIGN_IN_CANCELLED' ||
+    code === '-5' ||
+    code === '12501' ||
+    /cancel/i.test(String(e?.message ?? ''))
+  );
+}
 
 export default function ChooseAuthScreen() {
   const { signInWithApple, signInWithGoogle } = useAuth();
+  const [busy, setBusy] = useState(false);
 
   const social = async (fn: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
     try {
       await fn();
     } catch (e: any) {
-      toast.error('Sign in failed', { text2: e?.message });
+      if (!isCancellation(e)) {
+        toast.error('Sign in failed', { text2: e?.message });
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -47,10 +72,12 @@ export default function ChooseAuthScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Sign in with Apple"
+              accessibilityState={{ disabled: busy }}
+              disabled={busy}
               onPress={() => social(signInWithApple)}
               style={({ pressed }) => [
                 styles.socialButton,
-                pressed && styles.socialButtonPressed,
+                (pressed || busy) && styles.socialButtonPressed,
               ]}
             >
               <Ionicons name="logo-apple" size={26} color={colors.textOnDark} />
@@ -59,10 +86,12 @@ export default function ChooseAuthScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Continue with Google"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
             onPress={() => social(signInWithGoogle)}
             style={({ pressed }) => [
               styles.socialButton,
-              pressed && styles.socialButtonPressed,
+              (pressed || busy) && styles.socialButtonPressed,
             ]}
           >
             <Ionicons name="logo-google" size={24} color={colors.textOnDark} />

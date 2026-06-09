@@ -11,6 +11,14 @@ export type ProfileRow = {
   updated_at: string;
 };
 
+/** Parse an ISO timestamp, falling back to 0 for null/garbage values so
+ *  downstream date math never propagates NaN. */
+function parseTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export function rowToProfile(row: ProfileRow): Profile {
   return {
     id: row.id,
@@ -20,7 +28,7 @@ export function rowToProfile(row: ProfileRow): Profile {
     avatarUri: row.avatar_url,
     bike: row.bike,
     weeklyRideGoal: row.weekly_ride_goal,
-    updatedAt: Date.parse(row.updated_at),
+    updatedAt: parseTimestamp(row.updated_at),
   };
 }
 

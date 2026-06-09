@@ -1,18 +1,17 @@
 import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
+import { useSignUpFlow } from '@/lib/auth';
 import { toast } from '@/lib/toast';
 import { colors, spacing, typography } from '@/theme';
 import { ArrowLeft } from '@solar-icons/react-native/Linear';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
 export default function SignUpEmailScreen() {
-  const params = useLocalSearchParams<{ email?: string }>();
-  const [email, setEmail] = useState(
-    typeof params.email === 'string' ? params.email : '',
-  );
+  const flow = useSignUpFlow();
+  const [email, setEmail] = useState(flow.email);
 
   const trimmed = email.trim();
   const canSubmit = trimmed.length > 0;
@@ -22,10 +21,8 @@ export default function SignUpEmailScreen() {
       toast.error('Enter a valid email');
       return;
     }
-    router.push({
-      pathname: '/auth/sign-up/password',
-      params: { email: trimmed },
-    } as Href);
+    flow.setEmail(trimmed);
+    router.push('/auth/sign-up/password' as Href);
   };
 
   return (
@@ -43,8 +40,10 @@ export default function SignUpEmailScreen() {
           icon={<ArrowLeft size={22} color={colors.textOnDark} />}
         />
 
-        <Text style={styles.title}>WHAT'S YOUR EMAIL?</Text>
-        <Text style={styles.subtitle}>We'll use this to set up your account.</Text>
+        <Text style={styles.title}>{"WHAT'S YOUR EMAIL?"}</Text>
+        <Text style={styles.subtitle}>
+          {"We'll use this to set up your account."}
+        </Text>
 
         <InputField
           label="Email"

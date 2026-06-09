@@ -1,29 +1,34 @@
 import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
-import { useAuth } from '@/lib/auth';
+import { useAuth, useSignUpFlow } from '@/lib/auth';
 import { toast } from '@/lib/toast';
 import { colors, spacing, typography } from '@/theme';
 import { ArrowLeft } from '@solar-icons/react-native/Linear';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function SignUpConfirmScreen() {
   const { signUpWithEmail } = useAuth();
-  const params = useLocalSearchParams<{ email?: string; password?: string }>();
-  const email = typeof params.email === 'string' ? params.email : '';
-  const password = typeof params.password === 'string' ? params.password : '';
+  const flow = useSignUpFlow();
+  const { email, password } = flow;
 
   const [confirm, setConfirm] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = confirm.length > 0;
+  const canSubmit = confirm.length > 0 && !submitting;
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (confirm !== password) {
       toast.error('Passwords do not match');
       return;
     }
+    setSubmitting(true);
     try {
       const { needsConfirmation } = await signUpWithEmail(email, password);
+      // Clear the draft credentials from memory as soon as the account
+      // request succeeds, regardless of the confirmation branch.
+      flow.reset();
       if (needsConfirmation) {
         router.replace('/auth/sign-up/check-email' as Href);
       }
@@ -31,6 +36,8 @@ export default function SignUpConfirmScreen() {
       // straight into the profile wizard — no need to navigate here.
     } catch (e: any) {
       toast.error('Sign up failed', { text2: e?.message });
+    } finally {
+      setSubmitting(false);
     }
   };
 

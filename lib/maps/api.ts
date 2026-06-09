@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { decodePolyline, type LatLng } from './polyline';
 
 /**
@@ -6,12 +7,17 @@ import { decodePolyline, type LatLng } from './polyline';
  *   - Place Details        (resolve a placeId to coordinates)
  *   - Directions           (route + traffic-aware duration)
  *
- * Keys live in EXPO_PUBLIC_GOOGLE_MAPS_API_KEY so they're inlined into the
- * JS bundle. In production, restrict the key by bundle ID and consider
- * proxying through a server to avoid exposing it to clients.
+ * The key comes from a single source — the `GOOGLE_MAPS_API_KEY` env var,
+ * surfaced via `app.config.ts`'s `extra.googleMapsApiKey` (the same value
+ * also wired into the native iOS/Android map config). Reading it from
+ * `extra` keeps one source of truth; note it is still inlined into the JS
+ * bundle, so in production restrict the key by bundle ID and consider
+ * proxying these calls through a server to avoid exposing it to clients.
  */
 
-const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+const API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey as
+  | string
+  | undefined;
 const BASE = 'https://maps.googleapis.com/maps/api';
 
 export class MapsApiError extends Error {
@@ -26,7 +32,7 @@ function ensureKey(): string {
   if (!API_KEY) {
     throw new MapsApiError(
       'MISSING_KEY',
-      'EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not set. Add it to .env.',
+      'GOOGLE_MAPS_API_KEY is not set. Add it to .env.',
     );
   }
   return API_KEY;

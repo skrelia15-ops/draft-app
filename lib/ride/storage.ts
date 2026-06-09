@@ -1,8 +1,8 @@
 /**
  * Ride history persistence, backed by the Supabase `rides` table.
- * saveHistory upserts the full set the provider holds; loadHistory pulls
- * the signed-in user's rides newest-first. Trace downsampling is retained
- * to keep row size sane.
+ * saveRide upserts a single finished ride (scoped to the signed-in user);
+ * loadHistory pulls the signed-in user's rides newest-first. Trace
+ * downsampling is retained to keep row size sane.
  */
 import { supabase } from '@/lib/supabase';
 import { downsample, MAX_PERSISTED_SAMPLES } from './telemetry';
@@ -19,18 +19,32 @@ export async function loadHistory(): Promise<RideRecord[]> {
   return (data as unknown as RideRow[]).map(rowToRide);
 }
 
-export async function saveHistory(history: RideRecord[]): Promise<void> {
+/**
+ * Persist a single finished ride for the signed-in user. We upsert exactly
+ * the one new record — never the whole in-memory list — so a stale or
+ * cross-user history array can't clobber the table or get re-stamped under
+ * the wrong user_id. Returns false (and warns) if there's no live session.
+ */
+export async function saveRide(record: RideRecord): Promise<boolean> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;
-  if (!uid) return;
-  const rows = history.map((r) =>
-    rideToRow({ ...r, samples: downsample(r.samples, MAX_PERSISTED_SAMPLES) }, uid),
+  if (!uid) {
+    console.warn('[ride/storage] saveRide skipped: no signed-in user');
+    return false;
+  }
+  const row = rideToRow(
+    { ...record, samples: downsample(record.samples, MAX_PERSISTED_SAMPLES) },
+    uid,
   );
   // rideToRow returns RideRow with typed samples/segments/origin/destination
   // (RideSample[], RideSegment[], LatLng | null) which are narrower than the
   // generated Insert type's Json fields. Cast to `never` to bridge the gap.
-  const { error } = await supabase.from('rides').upsert(rows as never[], { onConflict: 'id' });
-  if (error && __DEV__) console.warn('[ride/storage] saveHistory failed', error);
+  const { error } = await supabase.from('rides').upsert(row as never, { onConflict: 'id' });
+  if (error) {
+    console.warn('[ride/storage] saveRide failed', error);
+    return false;
+  }
+  return true;
 }
 
 export async function clearHistory(): Promise<void> {

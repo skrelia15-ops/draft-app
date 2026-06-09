@@ -1,18 +1,17 @@
 import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
+import { useSignUpFlow } from '@/lib/auth';
 import { toast } from '@/lib/toast';
 import { colors, spacing, typography } from '@/theme';
 import { ArrowLeft } from '@solar-icons/react-native/Linear';
-import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-const MIN_LENGTH = 6;
+const MIN_LENGTH = 8;
 
 export default function SignUpPasswordScreen() {
-  const params = useLocalSearchParams<{ email?: string }>();
-  const email = typeof params.email === 'string' ? params.email : '';
-
-  const [password, setPassword] = useState('');
+  const flow = useSignUpFlow();
+  const [password, setPassword] = useState(flow.password);
 
   const canSubmit = password.length > 0;
 
@@ -23,10 +22,8 @@ export default function SignUpPasswordScreen() {
       });
       return;
     }
-    router.push({
-      pathname: '/auth/sign-up/confirm',
-      params: { email, password },
-    } as Href);
+    flow.setPassword(password);
+    router.push('/auth/sign-up/confirm' as Href);
   };
 
   return (

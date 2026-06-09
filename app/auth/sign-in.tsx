@@ -12,14 +12,20 @@ export default function SignInScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0;
+  const canSubmit =
+    email.trim().length > 0 && password.length > 0 && !submitting;
 
   const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await signInWithEmail(email.trim(), password);
     } catch (e: any) {
       toast.error('Could not sign in', { text2: e?.message });
+    } finally {
+      setSubmitting(false);
     }
   };
 

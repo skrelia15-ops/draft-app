@@ -18,10 +18,13 @@ export async function loadProfile(): Promise<Profile> {
   return rowToProfile(data as ProfileRow);
 }
 
-export async function saveProfile(profile: Profile): Promise<void> {
+export async function saveProfile(profile: Profile): Promise<boolean> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id;
-  if (!uid) return;
+  if (!uid) {
+    console.warn('[profile/storage] saveProfile skipped: no signed-in user');
+    return false;
+  }
   // profileToRow returns ProfileUpdate (Bike | null for bike) which is
   // narrower than the generated Update type's Json | null. Cast to `never`
   // to satisfy the overloaded .update() signature while keeping our logic.
@@ -29,7 +32,11 @@ export async function saveProfile(profile: Profile): Promise<void> {
     .from('profiles')
     .update({ ...profileToRow(profile), updated_at: new Date().toISOString() } as never)
     .eq('id', uid);
-  if (error && __DEV__) console.warn('[profile/storage] saveProfile failed', error);
+  if (error) {
+    console.warn('[profile/storage] saveProfile failed', error);
+    return false;
+  }
+  return true;
 }
 
 /** Local-only reset used on sign-out; the cloud row stays intact. */

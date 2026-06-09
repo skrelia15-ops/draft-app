@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabase';
 import type { LatLng } from '@/lib/maps';
 import { draftingAt } from './drafting';
 import { liveWattsSaved, summarizeRide } from './insights';
-import { loadHistory, saveHistory } from './storage';
+import { loadHistory, saveRide } from './storage';
 import {
   haversineMeters,
   msToKmh,
@@ -117,14 +117,50 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
   // Load the signed-in user's history. onAuthStateChange fires
   // INITIAL_SESSION on subscribe (initial load) and again on sign in/out;
   // only reload when the user actually changes so token refreshes don't
-  // trigger redundant fetches.
+  // trigger redundant fetches. When the user DOES change we fully reset all
+  // in-memory ride state and the in-flight refs first — otherwise the new
+  // user would briefly see the previous user's lastFinished / phase /
+  // history (RLS prevents reading their rows from the DB, but the stale
+  // React state would still flash on screen).
   useEffect(() => {
     let lastUid: string | null | undefined;
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user?.id ?? null;
       if (uid === lastUid) return;
       lastUid = uid;
-      loadHistory().then(setHistory);
+
+      // Tear down any active ride and wipe state/refs for the prior user.
+      subscriptionRef.current?.remove();
+      subscriptionRef.current = null;
+      if (tickRef.current) {
+        clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      rideIdRef.current = null;
+      samplesRef.current = [];
+      startedAtRef.current = 0;
+      pausedAtRef.current = null;
+      pausedTotalMsRef.current = 0;
+      recentSpeedsRef.current = [];
+      routeDistanceRef.current = null;
+      originRef.current = null;
+      destRef.current = null;
+      routeNameRef.current = null;
+      fallbackPaceKmhRef.current = 28;
+
+      setPhase('idle');
+      setLiveStats(EMPTY_LIVE);
+      setLastFinished(null);
+      setRouteName(null);
+      setRouteCoordinates([]);
+      setDestination(null);
+      setHistory([]);
+
+      loadHistory()
+        .then(setHistory)
+        .catch((e) => {
+          console.warn('[RideProvider] loadHistory failed', e);
+        });
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -239,9 +275,10 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
         : fallbackPaceKmhRef.current / 3.6;
       etaSec = remainingMeters / speedForEta;
     }
-    // Cap absurd ETAs (no GPS / no motion / huge distance) so we don't
-    // render "42 days to go" in the UI.
-    if (etaSec != null && etaSec > 12 * 60 * 60) {
+    // Drop non-finite ETAs (0/0 = NaN when stationary at the destination,
+    // or Infinity when the fallback pace is 0) and cap absurd ones (no GPS /
+    // no motion / huge distance) so we don't render "42 days to go".
+    if (etaSec != null && (!Number.isFinite(etaSec) || etaSec > 12 * 60 * 60)) {
       etaSec = null;
     }
 
@@ -387,11 +424,10 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
 
     setPhase('finished');
     setLastFinished(record);
-    setHistory((prev) => {
-      const next = [record, ...prev];
-      saveHistory(next);
-      return next;
-    });
+    setHistory((prev) => [record, ...prev]);
+    // Persist only the single new record — never the whole in-memory list —
+    // so a stale array can't clobber the table or re-stamp rows.
+    void saveRide(record);
     return record;
   }, [phase, stopSubscription, stopTick]);
 

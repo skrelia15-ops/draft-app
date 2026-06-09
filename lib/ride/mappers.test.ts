@@ -29,6 +29,21 @@ test('rideToRow then rowToRide round-trips the record', () => {
   expect(back).toEqual(ride);
 });
 
+test('rowToRide coerces null timestamps and numerics to 0 (no NaN)', () => {
+  const row = rideToRow(ride, 'u');
+  const back = rowToRide({
+    ...row,
+    started_at: null as never,
+    ended_at: 'garbage',
+    distance_meters: null as never,
+    avg_speed_kmh: null as never,
+  });
+  expect(back.startedAt).toBe(0);
+  expect(back.endedAt).toBe(0);
+  expect(back.distanceMeters).toBe(0);
+  expect(back.avgSpeedKmh).toBe(0);
+});
+
 test('rowToRide tolerates missing optional route fields', () => {
   const row = rideToRow({ ...ride, routeName: undefined, origin: undefined, destination: undefined }, 'u');
   const back = rowToRide(row);

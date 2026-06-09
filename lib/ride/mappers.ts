@@ -43,21 +43,34 @@ export function rideToRow(r: RideRecord, userId: string): RideRow {
   };
 }
 
+/** Parse an ISO timestamp, falling back to 0 for null/garbage values so
+ *  date math (relative-time, week bucketing) never propagates NaN. */
+function parseTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+/** Coerce a possibly-null numeric column to a finite number. */
+function num(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
 export function rowToRide(row: RideRow): RideRecord {
   const record: RideRecord = {
     id: row.id,
-    startedAt: Date.parse(row.started_at),
-    endedAt: Date.parse(row.ended_at),
-    durationSec: row.duration_sec,
-    distanceMeters: row.distance_meters,
-    avgSpeedKmh: row.avg_speed_kmh,
-    maxSpeedKmh: row.max_speed_kmh,
+    startedAt: parseTimestamp(row.started_at),
+    endedAt: parseTimestamp(row.ended_at),
+    durationSec: num(row.duration_sec),
+    distanceMeters: num(row.distance_meters),
+    avgSpeedKmh: num(row.avg_speed_kmh),
+    maxSpeedKmh: num(row.max_speed_kmh),
     samples: row.samples ?? [],
     segments: row.segments ?? [],
-    draftingFraction: row.drafting_fraction,
-    energySavedPercent: row.energy_saved_percent,
-    energySavedWatts: row.energy_saved_watts,
-    potentialExtraEnergyPercent: row.potential_extra_energy_percent,
+    draftingFraction: num(row.drafting_fraction),
+    energySavedPercent: num(row.energy_saved_percent),
+    energySavedWatts: num(row.energy_saved_watts),
+    potentialExtraEnergyPercent: num(row.potential_extra_energy_percent),
   };
   if (row.route_name != null) record.routeName = row.route_name;
   if (row.origin != null) record.origin = row.origin;
