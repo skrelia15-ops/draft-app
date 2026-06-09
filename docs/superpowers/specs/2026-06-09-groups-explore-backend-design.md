@@ -122,7 +122,7 @@ of the group (or the group owner).
   inline Join). Header gains a "+" button → create group. Per-section empty
   states.
 - **`app/groups/[id].tsx`** — group detail: header (name, pace, train type,
-  member count), member list, this group's UPCOMING RIDES, Join/Leave button.
+  member count), this group's UPCOMING RIDES, Join/Leave button.
   Members see "Schedule ride"; the owner sees Delete. (Owner **Edit** is
   deferred to a later iteration — `updateGroup` storage exists and is ready,
   but no Edit form ships this iteration.)
@@ -138,8 +138,16 @@ of the group (or the group owner).
 
 ### `lib/groups/`
 
-- `types.ts` — `Group`, `GroupMember`, `GroupRide` domain types + enums
+- `types.ts` — `Group`, `GroupRide` domain types + enums
   (`TrainType` reused/shared).
+
+> **Note (implementation):** the named member list was dropped. `profiles`
+> RLS only allows reading your own row (`auth.uid() = id`), so other members'
+> names/avatars can't be read without a privacy-relevant production RLS
+> change. Per product decision only the member **count** (from
+> `groups_with_counts`) is shown; the `GroupMember` type, `rowToGroupMember`
+> mapper, and `listMembers` storage fn were removed rather than ship a
+> silently-broken feature.
 - `mappers.ts` — `rowToGroup` / `rowToGroupRide` / etc., with row↔domain
   unit tests (mirrors `lib/profile/mappers.test.ts`).
 - `storage.ts` — `listMyGroups`, `listDiscoverGroups`, `getGroup`,
