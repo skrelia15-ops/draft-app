@@ -74,7 +74,10 @@ export async function listMembers(groupId: string): Promise<GroupMember[]> {
     .select('group_id, user_id, role, joined_at, profiles(name, avatar_url)')
     .eq('group_id', groupId)
     .order('joined_at', { ascending: true });
-  if (error || !data) return [];
+  if (error || !data) {
+    console.warn('[groups/storage] listMembers failed', error);
+    return [];
+  }
   return (data as unknown as GroupMemberRow[]).map(rowToGroupMember);
 }
 
@@ -176,7 +179,10 @@ export async function listUpcomingRides(): Promise<GroupRide[]> {
     .in('group_id', [...ids])
     .gte('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true });
-  if (error || !data) return [];
+  if (error || !data) {
+    console.warn('[groups/storage] listUpcomingRides failed', error);
+    return [];
+  }
   return (data as unknown as GroupRideRow[]).map(rowToGroupRide);
 }
 
@@ -187,7 +193,10 @@ export async function listGroupRides(groupId: string): Promise<GroupRide[]> {
     .eq('group_id', groupId)
     .gte('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true });
-  if (error || !data) return [];
+  if (error || !data) {
+    console.warn('[groups/storage] listGroupRides failed', error);
+    return [];
+  }
   return (data as unknown as GroupRideRow[]).map(rowToGroupRide);
 }
 
