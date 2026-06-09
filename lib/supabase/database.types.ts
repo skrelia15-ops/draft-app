@@ -107,8 +107,9 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_official: boolean
           name: string
-          owner_id: string
+          owner_id: string | null
           pace_kmh: number
           train_type: string
         }
@@ -116,8 +117,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_official?: boolean
           name: string
-          owner_id: string
+          owner_id?: string | null
           pace_kmh: number
           train_type: string
         }
@@ -125,8 +127,9 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_official?: boolean
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           pace_kmh?: number
           train_type?: string
         }
@@ -277,6 +280,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string | null
+          is_official: boolean | null
           member_count: number | null
           name: string | null
           owner_id: string | null
