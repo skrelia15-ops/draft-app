@@ -13,7 +13,8 @@ export type GroupRow = {
   description: string | null;
   pace_kmh: number;
   train_type: TrainType;
-  owner_id: string;
+  owner_id: string | null;
+  is_official: boolean;
   member_count: number | null;
   created_at: string;
 };
@@ -25,7 +26,7 @@ export function rowToGroup(row: GroupRow, isMember: boolean): Group {
     description: row.description,
     paceKmh: row.pace_kmh,
     trainType: row.train_type,
-    ownerId: row.owner_id,
+    ownerId: row.owner_id ?? '',
     memberCount: row.member_count ?? 0,
     isMember,
     createdAt: parseTs(row.created_at),

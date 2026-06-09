@@ -14,6 +14,7 @@ describe('rowToGroup', () => {
     pace_kmh: 32,
     train_type: 'ROTATING',
     owner_id: 'u1',
+    is_official: false,
     member_count: 22,
     created_at: '2026-06-09T00:00:00Z',
   };
@@ -34,6 +35,10 @@ describe('rowToGroup', () => {
 
   it('defaults member_count to 0 when the view returns null', () => {
     expect(rowToGroup({ ...ROW, member_count: null }, false).memberCount).toBe(0);
+  });
+
+  it('maps a null owner_id (official groups) to an empty string', () => {
+    expect(rowToGroup({ ...ROW, owner_id: null }, false).ownerId).toBe('');
   });
 });
 
