@@ -1,5 +1,5 @@
 import { useUserLocation } from '@/hooks/useUserLocation';
-import { darkMapStyle, type LatLng } from '@/lib/maps';
+import { darkMapStyle, ODESSA } from '@/lib/maps';
 import {
     buildRoutePreview,
     getCurrentConditions,
@@ -29,8 +29,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const MANHATTAN: LatLng = { latitude: 40.7484, longitude: -73.9857 };
-
 /**
  * Detail view for a single saved/discovered route.
  *
@@ -47,7 +45,7 @@ export default function RouteDetailsScreen() {
   const { findRoute } = useRoutes();
 
   const route = findRoute(params.id);
-  const origin = coords ?? MANHATTAN;
+  const origin = coords ?? ODESSA;
 
   const conditions = useMemo(() => getCurrentConditions(), []);
 

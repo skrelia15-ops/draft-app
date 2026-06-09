@@ -11,7 +11,7 @@ import { router, Href } from 'expo-router';
 import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Search, ChevronRight, XCircle } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '@/theme';
-import { darkMapStyle, type LatLng } from '@/lib/maps';
+import { darkMapStyle, ODESSA } from '@/lib/maps';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { buildRoutePreview } from '@/lib/ride';
 import {
@@ -46,8 +46,6 @@ const FILTER_SUBTITLE: Record<ExploreFilter, string> = {
   POPULAR: 'Where other riders are right now',
   'BY DIFFICULTY': 'Beginner-friendly routes first',
 };
-
-const MANHATTAN: LatLng = { latitude: 40.7484, longitude: -73.9857 };
 
 const DIFFICULTY_RANK: Record<ExploreRoute['difficulty'], number> = {
   EASY: 0,
@@ -126,7 +124,7 @@ export default function ExploreScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<TextInput | null>(null);
-  const origin = coords ?? MANHATTAN;
+  const origin = coords ?? ODESSA;
 
   /**
    * Apply the active filter first, then narrow further with the

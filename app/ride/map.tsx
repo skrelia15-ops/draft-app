@@ -38,6 +38,7 @@ import { toast } from '@/lib/toast';
 import {
   autocompletePlaces,
   darkMapStyle,
+  ODESSA,
   getCyclingDirections,
   getPlaceDetails,
   type LatLng,
@@ -48,13 +49,13 @@ import { useRide } from '@/lib/ride';
 import { colors, radius, spacing, typography } from '@/theme';
 
 /**
- * Default region centered on Manhattan — used briefly before the first
+ * Default region centered on Odessa — used briefly before the first
  * location fix arrives. The map animates to the user's actual position
  * as soon as `useUserLocation` resolves.
  */
 const FALLBACK_REGION: Region = {
-  latitude: 40.7484,
-  longitude: -73.9857,
+  latitude: ODESSA.latitude,
+  longitude: ODESSA.longitude,
   latitudeDelta: 0.05,
   longitudeDelta: 0.05,
 };
