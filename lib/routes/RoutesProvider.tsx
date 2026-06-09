@@ -8,15 +8,20 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { supabase } from '@/lib/supabase';
 import { listRoutes } from './storage';
 import { findRouteIn } from './helpers';
 import type { CatalogRoute } from './types';
 
 /**
- * Loads the route catalog from Supabase once at startup and exposes it to
- * Explore / RouteDetails / Groups. The catalog is small and effectively
- * static, so a single fetch + in-memory cache is enough; `refresh` is
- * provided for pull-to-refresh later.
+ * Loads the route catalog from Supabase and exposes it to
+ * Explore / RouteDetails / Groups.
+ *
+ * The catalog is readable only by authenticated users (RLS), so we must wait
+ * for the session to be restored before fetching — otherwise the first
+ * request goes out as anon and RLS returns []. We therefore load in response
+ * to `onAuthStateChange` (same pattern as GroupsProvider) rather than a
+ * one-shot mount fetch. `refresh` stays exposed for pull-to-refresh.
  */
 type RoutesContextValue = {
   routes: CatalogRoute[];
@@ -38,10 +43,23 @@ export function RoutesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh().catch((e) => {
-      console.warn('[RoutesProvider] initial load failed', e);
-      setIsHydrated(true);
+    let lastUid: string | null | undefined;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user?.id ?? null;
+      if (uid === lastUid) return;
+      lastUid = uid;
+      if (!uid) {
+        setRoutes([]);
+        setIsHydrated(true);
+        return;
+      }
+      setIsHydrated(false);
+      refresh().catch((e) => {
+        console.warn('[RoutesProvider] load failed', e);
+        setIsHydrated(true);
+      });
     });
+    return () => sub.subscription.unsubscribe();
   }, [refresh]);
 
   const findRoute = useCallback(
