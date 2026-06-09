@@ -14,6 +14,7 @@ import Toast from 'react-native-toast-message';
 import { RideProvider } from '@/lib/ride';
 import { ProfileProvider, useProfile } from '@/lib/profile';
 import { RoutesProvider } from '@/lib/routes';
+import { GroupsProvider } from '@/lib/groups';
 import { AuthProvider, useAuth, resolveRedirect } from '@/lib/auth';
 import { toastConfig } from '@/components/ui/draft/toast-config';
 
@@ -58,6 +59,7 @@ function RootNavigator() {
           options={{ presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="goals" />
+        <Stack.Screen name="groups" />
       </Stack>
       <StatusBar style="light" />
       <Toast config={toastConfig} />
@@ -88,7 +90,9 @@ export default function RootLayout() {
       <ProfileProvider>
         <RoutesProvider>
           <RideProvider>
-            <RootNavigator />
+            <GroupsProvider>
+              <RootNavigator />
+            </GroupsProvider>
           </RideProvider>
         </RoutesProvider>
       </ProfileProvider>
