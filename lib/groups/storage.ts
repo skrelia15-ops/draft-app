@@ -43,6 +43,7 @@ export async function listDiscoverGroups(): Promise<Group[]> {
   let query = supabase
     .from('groups_with_counts')
     .select('*')
+    .order('is_official', { ascending: false })
     .order('member_count', { ascending: false });
   if (ids.size > 0) {
     query = query.not('id', 'in', `(${[...ids].join(',')})`);
