@@ -1,7 +1,24 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { normalizeOpenWeather } from '../../../lib/weather/normalize.ts';
 
 const FRESH_MS = 15 * 60 * 1000;
+
+// Inlined to keep this function self-contained — Supabase only reliably
+// bundles files inside the function directory, so we don't import across
+// the project boundary. Mirrors lib/weather/normalize.ts (which is the
+// unit-tested source of truth); keep the two in sync if either changes.
+const WET_GROUPS = new Set(['Rain', 'Drizzle', 'Snow', 'Thunderstorm']);
+function normalizeOpenWeather(raw: any, observedAt: number) {
+  const group = raw?.weather?.[0]?.main ?? 'Clear';
+  return {
+    windKmh: Math.round((raw?.wind?.speed ?? 0) * 3.6),
+    windDeg: Math.round(raw?.wind?.deg ?? 0),
+    tempC: Math.round(raw?.main?.temp ?? 0),
+    feelsLikeC: Math.round(raw?.main?.feels_like ?? 0),
+    isRaining: WET_GROUPS.has(group),
+    rainMmLastHour: Math.round((raw?.rain?.['1h'] ?? 0) * 10) / 10,
+    observedAt,
+  };
+}
 
 Deno.serve(async (req) => {
   // Hoisted so the outer catch can still serve a usable cached row even
