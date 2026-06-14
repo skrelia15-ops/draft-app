@@ -2,16 +2,17 @@ import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
 import { useAuth } from '@/lib/auth';
 import { toast } from '@/lib/toast';
 import { colors, spacing, typography } from '@/theme';
-import { ArrowLeft } from '@solar-icons/react-native/Linear';
+import { ArrowLeft, Eye, EyeClosed } from '@solar-icons/react-native/Linear';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function SignInScreen() {
   const { signInWithEmail } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit =
@@ -22,8 +23,12 @@ export default function SignInScreen() {
     setSubmitting(true);
     try {
       await signInWithEmail(email.trim(), password);
-    } catch (e: any) {
-      toast.error('Could not sign in', { text2: e?.message });
+    } catch {
+      // Deliberately generic — never reveal whether the email or the
+      // password was the problem (avoids leaking which accounts exist).
+      toast.error('Could not sign in', {
+        text2: 'Check your email and password and try again.',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -65,8 +70,22 @@ export default function SignInScreen() {
           value={password}
           onChangeText={setPassword}
           placeholder="••••••••"
-          secureTextEntry
+          secureTextEntry={!showPassword}
           containerStyle={styles.input}
+          trailing={
+            <Pressable
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={spacing.sm}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? (
+                <EyeClosed size={20} color={colors.textMuted} />
+              ) : (
+                <Eye size={20} color={colors.textMuted} />
+              )}
+            </Pressable>
+          }
         />
       </ScrollView>
 

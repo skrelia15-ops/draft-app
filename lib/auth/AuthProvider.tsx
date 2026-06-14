@@ -105,13 +105,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Configure Google client IDs once — but never in Expo Go, where the
-  // native module is absent and touching it crashes the app.
+  // native module is absent and touching it crashes the app. Also skip
+  // (and never throw) when no client IDs are set: otherwise the native
+  // `configure` aborts the whole app with "failed to determine clientID".
+  // Email/Apple sign-in still work; the Google button just won't.
   useEffect(() => {
     if (isExpoGo) return;
-    loadGoogleSignin().configure({
-      iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    });
+    const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+    const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (!iosClientId && !webClientId) return;
+    try {
+      loadGoogleSignin().configure({ iosClientId, webClientId });
+    } catch (e) {
+      if (__DEV__) console.warn('[auth] Google Sign-In not configured:', e);
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
