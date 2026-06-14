@@ -56,8 +56,7 @@ export function getCompatibility(
       paceMatch: 0,
       cadenceMatch: 0,
       behaviorMatch: 0,
-      explanation:
-        'Riding style unlocks after your first ride. Draft matches you with riders that share your pace, cadence, and behaviour.',
+      explanation: 'Complete your first ride to unlock your riding style.',
     };
   }
 
@@ -132,8 +131,7 @@ export function getCompatibility(
 
   const distanceKm = Math.round(totalDistance / 100) / 10;
   const explanation =
-    `Based on ${history.length} ride${history.length === 1 ? '' : 's'} ` +
-    `(${distanceKm} km). Higher pace consistency and longer drafts raise this score.`;
+    `Based on ${history.length} ride${history.length === 1 ? '' : 's'} · ${distanceKm} km.`;
 
   return {
     score: clamp01(score),
