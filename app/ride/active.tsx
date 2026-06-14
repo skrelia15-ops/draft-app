@@ -1,3 +1,4 @@
+import { useLiveHeartRate } from '@/lib/health';
 import {
     formatDistanceMeters,
     formatHourMin,
@@ -77,6 +78,8 @@ export default function ActiveRideScreen() {
     resumeRide,
     finishRide,
   } = useRide();
+
+  const bpm = useLiveHeartRate(phase === 'active');
 
   const [holding, setHolding] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,6 +198,7 @@ export default function ActiveRideScreen() {
             <Text style={styles.energyValue}>{energyText}</Text>
           </View>
           <Text style={styles.timer}>{elapsedText}</Text>
+          {bpm != null && <Text style={styles.bpm}>{bpm} BPM</Text>}
         </View>
       </View>
 
@@ -396,6 +400,13 @@ const styles = StyleSheet.create({
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.base,
+  },
+  bpm: {
+    color: colors.primary,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.xs,
+    letterSpacing: typography.letterSpacing.wide,
+    marginTop: spacing['3xs'],
   },
   gaugeArea: {
     flex: 1,
