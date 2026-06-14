@@ -11,7 +11,7 @@
  * stable enough for the same view to render the same list twice in a row.
  */
 import type { LatLng } from '@/lib/maps';
-import { getCurrentConditions, type CompassDirection } from './conditions';
+import type { CompassDirection } from './conditions';
 
 export type DraftPotential = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -96,12 +96,12 @@ function rngFrom(seed: number) {
 export function getNearbyRiders(
   coords: LatLng | null,
   userPaceKmh: number = 28,
+  draftLabel: 'OPTIMAL' | 'GOOD' | 'FAIR' | 'POOR' = 'GOOD',
 ): NearbyRider[] {
   const seed = bucketSeed(coords);
   const rng = rngFrom(seed);
   const count = 3 + Math.floor(rng() * 3); // 3–5 riders
 
-  const conditions = getCurrentConditions();
   const out: NearbyRider[] = [];
 
   for (let i = 0; i < count; i++) {
@@ -132,7 +132,7 @@ export function getNearbyRiders(
     }
 
     // Conditions nudge: poor wind drops the headline rating one notch
-    if (conditions.draftLabel === 'POOR' && potential === 'HIGH') {
+    if (draftLabel === 'POOR' && potential === 'HIGH') {
       potential = 'MEDIUM';
     }
 

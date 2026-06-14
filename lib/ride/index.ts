@@ -7,7 +7,7 @@ export {
   summarizeRide,
 } from './insights';
 export type { RideInsights, RideComparison } from './insights';
-export { getCurrentConditions } from './conditions';
+export { deriveConditions } from './conditions';
 export type { Conditions, CompassDirection } from './conditions';
 export { clusterNearbyRiders, getNearbyRiders } from './proximity';
 export type { NearbyRider, DraftPotential, RiderCluster } from './proximity';
