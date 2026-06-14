@@ -43,6 +43,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     'expo-router',
+    './plugins/withModularHeaders',
     [
       'expo-splash-screen',
       {
