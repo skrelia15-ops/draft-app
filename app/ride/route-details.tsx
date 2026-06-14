@@ -26,7 +26,7 @@ import {
 } from '@solar-icons/react-native/Linear';
 import { Href, router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -132,7 +132,7 @@ export default function RouteDetailsScreen() {
       >
         <View style={styles.mapWrap}>
           <MapView
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
             customMapStyle={darkMapStyle}
             region={region}

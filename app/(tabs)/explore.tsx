@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   Pressable,
-  Platform,
 } from 'react-native';
 import { router, Href } from 'expo-router';
 import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -82,7 +81,7 @@ function RouteMiniMap({
   return (
     <View style={[styles.routeMiniMap, featured && styles.routeMiniMapFeatured]}>
       <MapView
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
         customMapStyle={darkMapStyle}
         region={previewRegion(preview)}

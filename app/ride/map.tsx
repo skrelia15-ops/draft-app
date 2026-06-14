@@ -444,7 +444,7 @@ export default function RideMapScreen() {
 
       <MapView
         ref={mapRef}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+        provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
         customMapStyle={darkMapStyle}
         initialRegion={FALLBACK_REGION}
