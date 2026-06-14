@@ -15,6 +15,7 @@ import { RideProvider } from '@/lib/ride';
 import { ProfileProvider, useProfile } from '@/lib/profile';
 import { RoutesProvider } from '@/lib/routes';
 import { GroupsProvider } from '@/lib/groups';
+import { WeatherProvider } from '@/lib/weather';
 import { AuthProvider, useAuth, resolveRedirect } from '@/lib/auth';
 import { toastConfig } from '@/components/ui/draft/toast-config';
 
@@ -90,9 +91,11 @@ export default function RootLayout() {
       <ProfileProvider>
         <RoutesProvider>
           <RideProvider>
-            <GroupsProvider>
-              <RootNavigator />
-            </GroupsProvider>
+            <WeatherProvider>
+              <GroupsProvider>
+                <RootNavigator />
+              </GroupsProvider>
+            </WeatherProvider>
           </RideProvider>
         </RoutesProvider>
       </ProfileProvider>
