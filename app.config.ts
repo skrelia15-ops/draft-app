@@ -72,6 +72,15 @@ const config: ExpoConfig = {
           'Allow DRAFT to use your camera so you can take a profile picture.',
       },
     ],
+    [
+      '@kingstinct/react-native-healthkit',
+      {
+        NSHealthShareUsageDescription:
+          'Allow DRAFT to read your heart rate and calories to enrich your ride stats.',
+        NSHealthUpdateUsageDescription:
+          'Allow DRAFT to save your rides to Apple Health as cycling workouts.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
