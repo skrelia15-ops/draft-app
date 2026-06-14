@@ -17,6 +17,9 @@ export type RideRow = {
   route_name: string | null;
   origin: LatLng | null;
   destination: LatLng | null;
+  avg_heart_rate: number | null;
+  max_heart_rate: number | null;
+  active_calories: number | null;
   samples: RideSample[];
   segments: RideSegment[];
 };
@@ -38,6 +41,9 @@ export function rideToRow(r: RideRecord, userId: string): RideRow {
     route_name: r.routeName ?? null,
     origin: r.origin ?? null,
     destination: r.destination ?? null,
+    avg_heart_rate: r.health?.avgHeartRate ?? null,
+    max_heart_rate: r.health?.maxHeartRate ?? null,
+    active_calories: r.health?.activeCalories ?? null,
     samples: r.samples,
     segments: r.segments,
   };
@@ -75,5 +81,16 @@ export function rowToRide(row: RideRow): RideRecord {
   if (row.route_name != null) record.routeName = row.route_name;
   if (row.origin != null) record.origin = row.origin;
   if (row.destination != null) record.destination = row.destination;
+  if (
+    row.avg_heart_rate != null ||
+    row.max_heart_rate != null ||
+    row.active_calories != null
+  ) {
+    record.health = {
+      avgHeartRate: row.avg_heart_rate,
+      maxHeartRate: row.max_heart_rate,
+      activeCalories: row.active_calories,
+    };
+  }
   return record;
 }

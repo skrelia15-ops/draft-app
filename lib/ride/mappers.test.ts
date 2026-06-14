@@ -51,3 +51,21 @@ test('rowToRide tolerates missing optional route fields', () => {
   expect(back.origin).toBeUndefined();
   expect(back.destination).toBeUndefined();
 });
+
+test('round-trips health metrics through the row', () => {
+  const withHealth = {
+    ...ride,
+    health: { avgHeartRate: 142, maxHeartRate: 171, activeCalories: 540 },
+  };
+  const row = rideToRow(withHealth, 'user-1');
+  expect(row.avg_heart_rate).toBe(142);
+  expect(row.max_heart_rate).toBe(171);
+  expect(row.active_calories).toBe(540);
+  expect(rowToRide(row).health).toEqual(withHealth.health);
+});
+
+test('omits health when all metrics are null/absent', () => {
+  const row = rideToRow(ride, 'user-1');
+  expect(row.avg_heart_rate).toBe(null);
+  expect(rowToRide(row).health).toBeUndefined();
+});
