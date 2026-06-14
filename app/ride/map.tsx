@@ -26,7 +26,6 @@ import {
 import MapView, {
   Marker,
   Polyline,
-  PROVIDER_GOOGLE,
   type LongPressEvent,
   type MapPressEvent,
   type Region,
@@ -38,6 +37,7 @@ import { toast } from '@/lib/toast';
 import {
   autocompletePlaces,
   darkMapStyle,
+  MAP_PROVIDER,
   ODESSA,
   getCyclingDirections,
   getPlaceDetails,
@@ -444,7 +444,7 @@ export default function RideMapScreen() {
 
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
+        provider={MAP_PROVIDER}
         style={StyleSheet.absoluteFill}
         customMapStyle={darkMapStyle}
         initialRegion={FALLBACK_REGION}

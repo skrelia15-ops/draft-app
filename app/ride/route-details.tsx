@@ -1,5 +1,5 @@
 import { useUserLocation } from '@/hooks/useUserLocation';
-import { darkMapStyle, ODESSA } from '@/lib/maps';
+import { darkMapStyle, MAP_PROVIDER, ODESSA } from '@/lib/maps';
 import {
     buildRoutePreview,
     deriveConditions,
@@ -27,7 +27,7 @@ import {
 import { Href, router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const FALLBACK_WEATHER = {
@@ -132,7 +132,7 @@ export default function RouteDetailsScreen() {
       >
         <View style={styles.mapWrap}>
           <MapView
-            provider={PROVIDER_GOOGLE}
+            provider={MAP_PROVIDER}
             style={StyleSheet.absoluteFill}
             customMapStyle={darkMapStyle}
             region={region}

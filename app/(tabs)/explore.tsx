@@ -8,10 +8,10 @@ import {
   Pressable,
 } from 'react-native';
 import { router, Href } from 'expo-router';
-import MapView, { Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Polyline } from 'react-native-maps';
 import { Search, ChevronRight, XCircle } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '@/theme';
-import { darkMapStyle, ODESSA } from '@/lib/maps';
+import { darkMapStyle, MAP_PROVIDER, ODESSA } from '@/lib/maps';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { buildRoutePreview } from '@/lib/ride';
 import {
@@ -81,7 +81,7 @@ function RouteMiniMap({
   return (
     <View style={[styles.routeMiniMap, featured && styles.routeMiniMapFeatured]}>
       <MapView
-        provider={PROVIDER_GOOGLE}
+        provider={MAP_PROVIDER}
         style={StyleSheet.absoluteFill}
         customMapStyle={darkMapStyle}
         region={previewRegion(preview)}

@@ -10,7 +10,7 @@ const { withAppDelegate } = require('@expo/config-plugins');
 
 const IMPORT_LINE = 'import GoogleMaps';
 const INIT_BLOCK =
-  '    if let googleMapsApiKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String {\n' +
+  '    if let googleMapsApiKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !googleMapsApiKey.isEmpty {\n' +
   '      GMSServices.provideAPIKey(googleMapsApiKey)\n' +
   '    }\n\n';
 
