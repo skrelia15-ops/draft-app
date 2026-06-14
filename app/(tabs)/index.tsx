@@ -1,8 +1,8 @@
 import { useUserLocation } from '@/hooks/useUserLocation';
 import {
     clusterNearbyRiders,
+    deriveConditions,
     getCompatibility,
-    getCurrentConditions,
     getNearbyRiders,
     useRide,
     type DraftPotential,
@@ -10,6 +10,7 @@ import {
 } from '@/lib/ride';
 import { buildGoalDays, GoalsCard } from '@/components/ui/draft';
 import { useProfile } from '@/lib/profile';
+import { useWeather } from '@/lib/weather';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Bolt } from '@solar-icons/react-native/Bold';
 import {
@@ -30,8 +31,20 @@ export default function HomeScreen() {
   const { coords } = useUserLocation();
   const { profile } = useProfile();
 
-  const conditions = useMemo(() => getCurrentConditions(), []);
-  const riders = useMemo(() => getNearbyRiders(coords), [coords]);
+  const { weather } = useWeather();
+  const conditions = useMemo(
+    () => (weather ? deriveConditions(weather) : null),
+    [weather],
+  );
+  const riders = useMemo(
+    () => getNearbyRiders(coords, profile.avgPaceKmh, conditions?.draftLabel),
+    [coords, profile.avgPaceKmh, conditions?.draftLabel],
+  );
+  const draftLabel = conditions?.draftLabel ?? 'GOOD';
+  const draftIndex = conditions?.draftIndex ?? 80;
+  const windKmh = conditions?.windKmh ?? 0;
+  const windFrom = conditions?.windFrom ?? 'N';
+  const draftAdvice = conditions?.draftAdvice ?? 'Fetching conditions…';
   const clusters = useMemo(() => clusterNearbyRiders(riders), [riders]);
   const compatibility = useMemo(
     () => getCompatibility(history, riders),
@@ -58,7 +71,7 @@ export default function HomeScreen() {
   );
 
   const estimatedSave = Math.round(
-    260 * (0.18 + (conditions.draftIndex / 100) * 0.16),
+    260 * (0.18 + (draftIndex / 100) * 0.16),
   );
 
   return (
@@ -89,11 +102,11 @@ export default function HomeScreen() {
         <View style={styles.heroTop}>
           <View style={styles.conditionPill}>
             <Text style={styles.conditionPillText}>
-              {conditions.draftLabel} CONDITIONS
+              {draftLabel} CONDITIONS
             </Text>
           </View>
           <View style={styles.draftIndex}>
-            <Text style={styles.draftIndexValue}>{conditions.draftIndex}%</Text>
+            <Text style={styles.draftIndexValue}>{draftIndex}%</Text>
             <Text style={styles.draftIndexLabel}>DRAFT INDEX</Text>
           </View>
         </View>
@@ -104,7 +117,7 @@ export default function HomeScreen() {
           <View style={styles.heroStat}>
             <Text style={styles.heroStatLabel}>WIND</Text>
             <Text style={styles.heroStatValue}>
-              {conditions.windKmh} km/h {conditions.windFrom}
+              {windKmh} km/h {windFrom}
             </Text>
           </View>
           <View style={styles.heroStat}>
@@ -119,9 +132,16 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {weather && (
+          <Text style={styles.heroWeatherLine}>
+            {weather.tempC}° · feels {weather.feelsLikeC}° ·{' '}
+            {weather.isRaining ? `Rain ${weather.rainMmLastHour} mm` : 'Dry'}
+          </Text>
+        )}
+
         <View style={styles.heroAdvice}>
           <Wind size={14} color={colors.textOnPrimary} />
-          <Text style={styles.heroAdviceText}>{conditions.draftAdvice}</Text>
+          <Text style={styles.heroAdviceText}>{draftAdvice}</Text>
         </View>
 
         <Pressable
@@ -421,6 +441,13 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
     fontFamily: typography.fontFamily.semibold,
     fontSize: typography.size.base,
+  },
+  heroWeatherLine: {
+    color: colors.textOnPrimary,
+    fontFamily: typography.fontFamily.semibold,
+    fontSize: typography.size['2xs'],
+    opacity: 0.8,
+    marginBottom: spacing.xs,
   },
   heroStatAccent: {
     // No longer needed visually — kept for backward compat with the
