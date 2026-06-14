@@ -2,9 +2,10 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import { darkMapStyle, ODESSA } from '@/lib/maps';
 import {
     buildRoutePreview,
-    getCurrentConditions,
+    deriveConditions,
     useRide,
 } from '@/lib/ride';
+import { useWeather } from '@/lib/weather';
 import {
     hashIdSeed,
     shapeLabel,
@@ -29,6 +30,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const FALLBACK_WEATHER = {
+  windKmh: 0, windDeg: 0, windFrom: 'N' as const, tempC: 0, feelsLikeC: 0,
+  isRaining: false, rainMmLastHour: 0, observedAt: 0,
+};
+
 /**
  * Detail view for a single saved/discovered route.
  *
@@ -47,7 +53,11 @@ export default function RouteDetailsScreen() {
   const route = findRoute(params.id);
   const origin = coords ?? ODESSA;
 
-  const conditions = useMemo(() => getCurrentConditions(), []);
+  const { weather } = useWeather();
+  const conditions = useMemo(
+    () => deriveConditions(weather ?? FALLBACK_WEATHER),
+    [weather],
+  );
 
   const preview = useMemo(
     () =>
