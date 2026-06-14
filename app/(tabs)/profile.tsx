@@ -1,5 +1,5 @@
 import { useAuth } from '@/lib/auth';
-import { isHealthAvailable, requestHealthAuth } from '@/lib/health';
+import { hasAskedHealthAuth, isHealthAvailable, requestHealthAuth } from '@/lib/health';
 import { avatarSignedUrl, isDirectUri, useProfile } from '@/lib/profile';
 import {
     formatDistanceMeters,
@@ -49,6 +49,7 @@ export default function ProfileScreen() {
   const [healthConnected, setHealthConnected] = useState(false);
   useEffect(() => {
     isHealthAvailable().then(setHealthAvailable);
+    hasAskedHealthAuth().then(setHealthConnected);
   }, []);
   const connectHealth = async () => {
     const ok = await requestHealthAuth();

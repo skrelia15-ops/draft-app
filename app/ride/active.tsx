@@ -1,4 +1,9 @@
-import { useLiveHeartRate } from '@/lib/health';
+import {
+  hasAskedHealthAuth,
+  isHealthAvailable,
+  requestHealthAuth,
+  useLiveHeartRate,
+} from '@/lib/health';
 import {
     formatDistanceMeters,
     formatHourMin,
@@ -80,6 +85,16 @@ export default function ActiveRideScreen() {
   } = useRide();
 
   const bpm = useLiveHeartRate(phase === 'active');
+
+  // One-time Apple Health prompt on the first ride, so live heart rate and
+  // the post-ride summary can work without first visiting Profile.
+  useEffect(() => {
+    void (async () => {
+      if ((await isHealthAvailable()) && !(await hasAskedHealthAuth())) {
+        await requestHealthAuth();
+      }
+    })();
+  }, []);
 
   const [holding, setHolding] = useState(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
