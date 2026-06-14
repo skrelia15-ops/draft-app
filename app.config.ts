@@ -44,6 +44,7 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     './plugins/withModularHeaders',
+    './plugins/withGoogleMapsInit',
     [
       'expo-splash-screen',
       {
