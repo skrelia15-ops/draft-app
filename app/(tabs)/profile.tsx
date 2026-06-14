@@ -146,6 +146,9 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.levelDim}> · {compatibility.score}/100</Text>
           </View>
+          <Text style={styles.levelExplain} numberOfLines={3}>
+            {compatibility.explanation}
+          </Text>
         </View>
 
         <Pressable
@@ -369,6 +372,13 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.medium,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wide,
+  },
+  levelExplain: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size['2xs'],
+    lineHeight: typography.size['2xs'] * typography.lineHeight.normal,
+    marginTop: spacing['2xs'],
   },
   settingsButton: {
     width: 40,

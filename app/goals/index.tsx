@@ -19,6 +19,7 @@ import {
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -73,11 +74,32 @@ export default function GoalsScreen() {
   const dec = () =>
     setGoalDraft((v) => Math.max(WEEKLY_GOAL_MIN, v - 1));
 
+  // Guard against silently losing an edited-but-unsaved goal when the
+  // rider taps back. Only prompts when there's an actual pending change.
+  const handleBack = () => {
+    if (!canSave) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      'Discard changes?',
+      'Your new weekly goal hasn’t been saved yet.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => router.back(),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel="Go back"

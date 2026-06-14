@@ -1,10 +1,11 @@
 // app/groups/[id].tsx
 import { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Href, router, useLocalSearchParams } from 'expo-router';
-import { ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/draft';
-import { colors, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
 import {
   getGroup,
   listGroupRides,
@@ -21,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/lib/toast';
 
 export default function GroupDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { refresh } = useGroups();
   const [group, setGroup] = useState<Group | null>(null);
@@ -46,8 +48,13 @@ export default function GroupDetailScreen() {
 
   if (!group) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <Text style={styles.meta}>Loading…</Text>
+      <View style={styles.container}>
+        <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
+          <BackButton />
+        </View>
+        <View style={[styles.container, styles.centered]}>
+          <Text style={styles.meta}>Loading…</Text>
+        </View>
       </View>
     );
   }
@@ -78,7 +85,13 @@ export default function GroupDetailScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md }]}
+    >
+      <View style={styles.headerRow}>
+        <BackButton />
+      </View>
       <Text style={styles.header}>{group.name}</Text>
       <Text style={styles.meta}>
         {group.memberCount} riders · {group.paceKmh} km/h · {trainTypeLabel(group.trainType)}
@@ -125,10 +138,39 @@ export default function GroupDetailScreen() {
   );
 }
 
+function BackButton() {
+  return (
+    <Pressable
+      onPress={() => router.back()}
+      style={styles.backButton}
+      accessibilityRole="button"
+      accessibilityLabel="Go back"
+      hitSlop={spacing.sm}
+    >
+      <ArrowLeft size={22} color={colors.textOnDark} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centered: { alignItems: 'center', justifyContent: 'center' },
   content: { padding: spacing.lg, paddingTop: spacing['4xl'], gap: spacing.md },
+  topRow: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  headerRow: {
+    marginBottom: spacing.xs,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     color: colors.textOnDark,
     fontFamily: typography.fontFamily.extrabold,

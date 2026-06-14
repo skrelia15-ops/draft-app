@@ -45,7 +45,11 @@ import {
   type PlacePrediction,
   type RouteResult,
 } from '@/lib/maps';
-import { useRide } from '@/lib/ride';
+import {
+  getNearbyRiders,
+  useRide,
+  type DraftPotential,
+} from '@/lib/ride';
 import { colors, radius, spacing, typography } from '@/theme';
 
 /**
@@ -117,6 +121,23 @@ export default function RideMapScreen() {
   const [trafficVisible, setTrafficVisible] = useState(true);
   const [navigating, setNavigating] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
+  // Lets the rider dismiss the location gate and plan a route manually
+  // (type addresses / pick on the map) without granting GPS — live
+  // location is only strictly required once the ride is actually active.
+  const [gateDismissed, setGateDismissed] = useState(false);
+
+  // Nearby riders (simulated) shown as dots on the map so the planner
+  // surfaces who's around before you start. Anchored to the live fix
+  // when available, otherwise to the fallback region so the demo always
+  // shows a few riders.
+  const riderBase = coords ?? {
+    latitude: FALLBACK_REGION.latitude,
+    longitude: FALLBACK_REGION.longitude,
+  };
+  const nearbyRiders = useMemo(
+    () => getNearbyRiders(coords ?? null),
+    [coords],
+  );
 
   // ── Camera: center on user once we get a fix.
   useEffect(() => {
@@ -394,7 +415,7 @@ export default function RideMapScreen() {
   }, [origin.coords, destination]);
 
   const showPermissionGate =
-    locStatus === 'denied' || locStatus === 'unavailable';
+    (locStatus === 'denied' || locStatus === 'unavailable') && !gateDismissed;
 
   // Toast once when permission is denied — the inline gate explains how
   // to recover, but a top toast gives an immediate, unmissable cue.
@@ -437,6 +458,32 @@ export default function RideMapScreen() {
         onPress={handleMapPress}
         onLongPress={handleMapLongPress}
       >
+        {nearbyRiders.map((rider) => {
+          const pos = offsetCoords(
+            riderBase,
+            rider.distanceMeters,
+            compassBearing(rider.compass),
+          );
+          return (
+            <Marker
+              key={rider.id}
+              coordinate={pos}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+            >
+              <View style={styles.riderMarker}>
+                <View
+                  style={[
+                    styles.riderDot,
+                    { backgroundColor: riderColor(rider.potential) },
+                  ]}
+                />
+                <Text style={styles.riderLabel}>{rider.name}</Text>
+              </View>
+            </Marker>
+          );
+        })}
+
         {origin.source === 'manual' && origin.coords && (
           <Marker coordinate={origin.coords} anchor={{ x: 0.5, y: 1 }}>
             <View style={styles.originPin}>
@@ -561,6 +608,8 @@ export default function RideMapScreen() {
         <PermissionGate
           message={locError ?? 'Location permission required.'}
           onRetry={retry}
+          onPlanWithoutGps={() => setGateDismissed(true)}
+          sheetHeight={sheetHeight}
         />
       )}
 
@@ -593,15 +642,69 @@ export default function RideMapScreen() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Nearby-rider helpers
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Compass label → bearing in degrees (N = 0, clockwise). */
+function compassBearing(compass: string): number {
+  const map: Record<string, number> = {
+    N: 0,
+    NE: 45,
+    E: 90,
+    SE: 135,
+    S: 180,
+    SW: 225,
+    W: 270,
+    NW: 315,
+  };
+  return map[compass] ?? 0;
+}
+
+/** Project a base coordinate `meters` along `bearingDeg` into a new LatLng. */
+function offsetCoords(
+  base: LatLng,
+  meters: number,
+  bearingDeg: number,
+): LatLng {
+  const R = 6378137; // Earth radius, meters
+  const d = meters / R;
+  const brng = (bearingDeg * Math.PI) / 180;
+  const lat1 = (base.latitude * Math.PI) / 180;
+  const lon1 = (base.longitude * Math.PI) / 180;
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) +
+      Math.cos(lat1) * Math.sin(d) * Math.cos(brng),
+  );
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+      Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
+    );
+  return { latitude: (lat2 * 180) / Math.PI, longitude: (lon2 * 180) / Math.PI };
+}
+
+/** Status hue for a rider's draft potential — same vocabulary as Home. */
+function riderColor(potential: DraftPotential): string {
+  if (potential === 'HIGH') return '#3FBF6E';
+  if (potential === 'MEDIUM') return '#F2A93B';
+  return colors.textMuted;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Subcomponents
 // ────────────────────────────────────────────────────────────────────────────
 
 function PermissionGate({
   message,
   onRetry,
+  onPlanWithoutGps,
+  sheetHeight,
 }: {
   message: string;
   onRetry: () => void;
+  onPlanWithoutGps: () => void;
+  sheetHeight: number;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -609,12 +712,22 @@ function PermissionGate({
       style={[styles.permissionWrap, { paddingHorizontal: spacing.lg }]}
       pointerEvents="box-none"
     >
-      <View style={[styles.permissionCard, { marginBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.permissionCard,
+          // Float clearly above the bottom sheet with a gap, so the two
+          // dark surfaces don't visually merge into one block.
+          { marginBottom: insets.bottom + sheetHeight + spacing.lg },
+        ]}
+      >
         <View style={styles.permissionIcon}>
           <DangerCircle size={22} color={colors.primary} />
         </View>
         <Text style={styles.permissionTitle}>LOCATION OFF</Text>
-        <Text style={styles.permissionBody}>{message}</Text>
+        <Text style={styles.permissionBody}>
+          {message} You can still plan a route by typing an address or
+          tapping the map — GPS is only needed once you start riding.
+        </Text>
         <View style={styles.permissionRow}>
           <Pressable style={styles.permissionGhost} onPress={onRetry}>
             <Text style={styles.permissionGhostText}>RETRY</Text>
@@ -626,6 +739,13 @@ function PermissionGate({
             <Text style={styles.permissionPrimaryText}>OPEN SETTINGS</Text>
           </Pressable>
         </View>
+        <Pressable
+          style={styles.permissionDismiss}
+          onPress={onPlanWithoutGps}
+          accessibilityRole="button"
+        >
+          <Text style={styles.permissionDismissText}>PLAN WITHOUT GPS</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -1395,6 +1515,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
+  // Nearby-rider markers — small coloured dot + handle, low visual
+  // weight so they read as ambient context, not waypoints.
+  riderMarker: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  riderDot: {
+    width: 14,
+    height: 14,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  riderLabel: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
+    textShadowColor: colors.background,
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
   // Pins
   destPin: {
     alignItems: 'center',
@@ -1451,7 +1594,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     alignItems: 'center',
-    justifyContent: 'center',
+    // Anchor the card to the bottom; its marginBottom lifts it above the
+    // sheet so the gate floats just over it with a clear gap.
+    justifyContent: 'flex-end',
     backgroundColor:
       Platform.OS === 'web' ? 'rgba(17,17,17,0.5)' : 'rgba(17,17,17,0.6)',
   },
@@ -1516,5 +1661,16 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.extrabold,
     fontSize: typography.size.sm,
     letterSpacing: typography.letterSpacing.wide,
+  },
+  permissionDismiss: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+  },
+  permissionDismissText: {
+    color: colors.textMuted,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.xs,
+    letterSpacing: typography.letterSpacing.wider,
   },
 });
