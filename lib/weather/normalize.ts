@@ -14,7 +14,7 @@ export function normalizeOpenWeather(raw: any, observedAt: number): WeatherDTO {
     tempC: Math.round(raw?.main?.temp ?? 0),
     feelsLikeC: Math.round(raw?.main?.feels_like ?? 0),
     isRaining: WET_GROUPS.has(group),
-    rainMmLastHour: raw?.rain?.['1h'] ?? 0,
+    rainMmLastHour: Math.round((raw?.rain?.['1h'] ?? 0) * 10) / 10,
     observedAt,
   };
 }

@@ -4,6 +4,9 @@ import { normalizeOpenWeather } from '../../../lib/weather/normalize.ts';
 const FRESH_MS = 15 * 60 * 1000;
 
 Deno.serve(async (req) => {
+  // Hoisted so the outer catch can still serve a usable cached row even
+  // if something after the cache read throws.
+  let cached: { payload: unknown; fetched_at: string } | null = null;
   try {
     const { lat, lng } = await req.json();
     if (typeof lat !== 'number' || typeof lng !== 'number') {
@@ -17,13 +20,14 @@ Deno.serve(async (req) => {
     );
 
     // 1. Fresh cache hit?
-    const { data: cached } = await admin
+    const { data } = await admin
       .from('weather_cache')
       .select('payload, fetched_at')
       .eq('cell_key', cellKey)
       .maybeSingle();
+    cached = data ?? null;
 
-    if (cached && Date.now() - new Date(cached.fetched_at).getTime() < FRESH_MS) {
+    if (cached && isFresh(cached.fetched_at)) {
       return json(cached.payload, 200);
     }
 
@@ -52,9 +56,17 @@ Deno.serve(async (req) => {
     });
     return json(dto, 200);
   } catch (e) {
+    // Last resort: any usable cached row beats a hard error.
+    if (cached) return json(cached.payload, 200);
     return json({ error: String(e) }, 500);
   }
 });
+
+/** True when `fetched_at` parses to a real time younger than FRESH_MS. */
+function isFresh(fetchedAt: string): boolean {
+  const t = new Date(fetchedAt).getTime();
+  return Number.isFinite(t) && Date.now() - t < FRESH_MS;
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
