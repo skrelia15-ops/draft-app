@@ -1,4 +1,5 @@
 import { useAuth } from '@/lib/auth';
+import { isHealthAvailable, requestHealthAuth } from '@/lib/health';
 import { avatarSignedUrl, isDirectUri, useProfile } from '@/lib/profile';
 import {
     formatDistanceMeters,
@@ -43,6 +44,18 @@ export default function ProfileScreen() {
   const compatibility = useMemo(() => getCompatibility(history), [history]);
   const { first, last } = splitName(profile.name);
   const bike = profile.bike;
+
+  const [healthAvailable, setHealthAvailable] = useState(false);
+  const [healthConnected, setHealthConnected] = useState(false);
+  useEffect(() => {
+    isHealthAvailable().then(setHealthAvailable);
+  }, []);
+  const connectHealth = async () => {
+    const ok = await requestHealthAuth();
+    setHealthConnected(ok);
+    if (ok) toast.success('Apple Health connected');
+    else toast.error('Could not connect Apple Health');
+  };
 
   // avatarUri may be a direct file://-or-http URI or a Supabase Storage
   // path; resolve paths to a temporary signed URL for display.
@@ -217,6 +230,19 @@ export default function ProfileScreen() {
             No bike added yet. Tap settings to set up your bike.
           </Text>
         </Pressable>
+      )}
+
+      {healthAvailable && (
+        <>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>APPLE HEALTH</Text>
+          <Pressable style={styles.activityCard} onPress={connectHealth} accessibilityRole="button">
+            <View style={styles.activityIcon}><Bolt size={20} color={colors.textOnDark} /></View>
+            <View style={styles.activityBody}>
+              <Text style={styles.activityName}>{healthConnected ? 'CONNECTED' : 'CONNECT APPLE HEALTH'}</Text>
+              <Text style={styles.activityInfo}>Sync rides + read heart rate and calories</Text>
+            </View>
+          </Pressable>
+        </>
       )}
 
       </ScrollView>
