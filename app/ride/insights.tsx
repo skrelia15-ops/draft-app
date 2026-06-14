@@ -125,6 +125,33 @@ export default function InsightsScreen() {
           />
         </View>
 
+        <View style={styles.coreStatsGrid}>
+          <CoreStat
+            label="Avg HR"
+            value={
+              lastFinished.health?.avgHeartRate != null
+                ? `${lastFinished.health.avgHeartRate} bpm`
+                : '—'
+            }
+          />
+          <CoreStat
+            label="Max HR"
+            value={
+              lastFinished.health?.maxHeartRate != null
+                ? `${lastFinished.health.maxHeartRate} bpm`
+                : '—'
+            }
+          />
+          <CoreStat
+            label="Calories"
+            value={
+              lastFinished.health?.activeCalories != null
+                ? `${lastFinished.health.activeCalories} kcal`
+                : '—'
+            }
+          />
+        </View>
+
         {/* Headline: energy saved */}
         <View style={styles.energyCard}>
           <Bolt size={36} color={colors.primary} />

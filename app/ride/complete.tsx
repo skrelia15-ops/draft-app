@@ -37,6 +37,20 @@ export default function CompleteScreen() {
       // sample buffer is too small to draw any conclusion.
       value: tooShort ? '—' : `${energyPercent}%`,
     },
+    {
+      label: 'AVG HR',
+      value:
+        lastFinished?.health?.avgHeartRate != null
+          ? `${lastFinished.health.avgHeartRate} bpm`
+          : '—',
+    },
+    {
+      label: 'CALORIES',
+      value:
+        lastFinished?.health?.activeCalories != null
+          ? `${lastFinished.health.activeCalories} kcal`
+          : '—',
+    },
   ];
 
   const goHome = () => {
