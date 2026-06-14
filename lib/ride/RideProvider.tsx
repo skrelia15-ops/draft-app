@@ -15,6 +15,7 @@ import type { LatLng } from '@/lib/maps';
 import { draftingAt } from './drafting';
 import { liveWattsSaved, summarizeRide } from './insights';
 import { loadHistory, saveRide } from './storage';
+import { summarizeRideHealth, saveRideToHealth } from '@/lib/health';
 import {
   haversineMeters,
   msToKmh,
@@ -428,6 +429,21 @@ export function RideProvider({ children }: { children: ReactNode }) {  const [ph
     // Persist only the single new record — never the whole in-memory list —
     // so a stale array can't clobber the table or re-stamp rows.
     void saveRide(record);
+    void (async () => {
+      const health = await summarizeRideHealth(record.startedAt, record.endedAt);
+      if (
+        health.avgHeartRate == null &&
+        health.maxHeartRate == null &&
+        health.activeCalories == null
+      ) {
+        return; // nothing to add (no Watch / denied / non-iOS)
+      }
+      const enriched: RideRecord = { ...record, health };
+      setLastFinished(enriched);
+      setHistory((prev) => prev.map((r) => (r.id === enriched.id ? enriched : r)));
+      void saveRide(enriched);
+      void saveRideToHealth(enriched);
+    })();
     return record;
   }, [phase, stopSubscription, stopTick]);
 
