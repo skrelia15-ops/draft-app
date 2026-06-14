@@ -7,6 +7,7 @@
  * so the post-ride math doesn't have to re-walk the raw samples.
  */
 import type { LatLng } from '@/lib/maps';
+import type { RideHealth } from '@/lib/health/types';
 
 export type RidePhase = 'idle' | 'active' | 'paused' | 'finished';
 
@@ -78,6 +79,8 @@ export type RideRecord = {
   routeName?: string;
   origin?: LatLng;
   destination?: LatLng;
+  /** Optional Apple Health metrics, attached after the ride finishes. */
+  health?: RideHealth;
 };
 
 /** Live, in-flight stats — derived from the active sample buffer. */
