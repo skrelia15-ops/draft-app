@@ -4,14 +4,13 @@ import {
   formatHourMin,
   useRide,
   type RideRecord,
-  type RideSegment,
 } from '@/lib/ride';
 import { colors, radius, spacing, typography } from '@/theme';
+import { ComparisonBadge } from '@/components/insights/ComparisonBadge';
+import { SegmentCallout, SegmentTimeline } from '@/components/insights/SegmentTimeline';
+import { SplitBar } from '@/components/insights/SplitBar';
 import {
-  ArrowDown,
-  ArrowUp,
   Bolt,
-  Cup,
   DangerCircle,
   Lightbulb,
 } from '@solar-icons/react-native/Linear';
@@ -302,104 +301,6 @@ function compareToAverage(current: RideRecord, history: RideRecord[]): string | 
   return `Vs average ride: ${speedText}, ${draftText}.`;
 }
 
-function ComparisonBadge({
-  comparison,
-}: {
-  comparison: NonNullable<ReturnType<typeof computeInsights>['comparison']>;
-}) {
-  const Icon =
-    comparison.direction === 'up'
-      ? ArrowUp
-      : comparison.direction === 'down'
-        ? ArrowDown
-        : null;
-  const tone =
-    comparison.direction === 'up'
-      ? colors.primary
-      : comparison.direction === 'down'
-        ? colors.textMuted
-        : colors.textMuted;
-  return (
-    <View style={[styles.comparisonRow, { borderColor: tone }]}>
-      {Icon ? (
-        <Icon size={14} color={tone} />
-      ) : (
-        <View style={[styles.comparisonDash, { backgroundColor: tone }]} />
-      )}
-      <Text style={[styles.comparisonText, { color: tone }]} numberOfLines={2}>
-        {comparison.summary}
-      </Text>
-    </View>
-  );
-}
-
-function SplitBar({ drafting, solo }: { drafting: number; solo: number }) {
-  const draftingClamped = Math.max(0, Math.min(100, drafting));
-  const soloClamped = Math.max(0, 100 - draftingClamped);
-  return (
-    <View style={styles.splitBar}>
-      <View
-        style={[
-          styles.splitBarFill,
-          { backgroundColor: colors.primary, flex: draftingClamped },
-        ]}
-      />
-      <View
-        style={[
-          styles.splitBarFill,
-          { backgroundColor: colors.textSubtle, flex: soloClamped },
-        ]}
-      />
-    </View>
-  );
-}
-
-function SegmentTimeline({ segments }: { segments: RideSegment[] }) {
-  return (
-    <View style={styles.timelineRow}>
-      {segments.map((seg) => (
-        <View
-          key={seg.index}
-          style={[
-            styles.timelineSeg,
-            {
-              backgroundColor:
-                seg.draftEfficiency >= 50 ? colors.primary : colors.textSubtle,
-              opacity: 0.5 + (seg.draftEfficiency / 100) * 0.5,
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-function SegmentCallout({
-  title,
-  icon,
-  segment,
-}: {
-  title: string;
-  icon: 'best' | 'worst';
-  segment: RideSegment;
-}) {
-  const Icon = icon === 'best' ? Cup : DangerCircle;
-  return (
-    <View style={styles.calloutCard}>
-      <View style={styles.calloutHeader}>
-        <Icon size={16} color={colors.primary} />
-        <Text style={styles.calloutTitle}>{title}</Text>
-      </View>
-      <Text style={styles.calloutMeta}>
-        KM {segment.startKm.toFixed(1)} – {segment.endKm.toFixed(1)} · {segment.draftEfficiency}% IN DRAFT
-      </Text>
-      <Text style={styles.calloutLabel}>{segment.label}</Text>
-      <Text style={styles.calloutSub}>
-        AVG {segment.avgSpeedKmh.toFixed(1)} KM/H
-      </Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -492,26 +393,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.sm,
     marginBottom: spacing.md,
   },
-  comparisonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-  },
-  comparisonDash: {
-    width: 10,
-    height: 2,
-    borderRadius: radius.pill,
-  },
-  comparisonText: {
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size.xs,
-    letterSpacing: typography.letterSpacing.wide,
-    flexShrink: 1,
-  },
   averageComparison: {
     color: colors.textMuted,
     fontFamily: typography.fontFamily.medium,
@@ -526,16 +407,6 @@ const styles = StyleSheet.create({
     letterSpacing: typography.letterSpacing.wider,
     marginBottom: spacing.sm,
     marginTop: spacing.lg,
-  },
-  splitBar: {
-    height: 14,
-    borderRadius: radius.pill,
-    flexDirection: 'row',
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceElevated,
-  },
-  splitBarFill: {
-    height: '100%',
   },
   splitLegend: {
     flexDirection: 'row',
@@ -563,54 +434,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
-  },
-  calloutCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  calloutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing['2xs'],
-  },
-  calloutTitle: {
-    color: colors.primary,
-    fontFamily: typography.fontFamily.bold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wider,
-  },
-  calloutMeta: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size['2xs'],
-    letterSpacing: typography.letterSpacing.wide,
-    marginBottom: spacing['2xs'],
-  },
-  calloutLabel: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.base,
-    marginBottom: spacing['3xs'],
-  },
-  calloutSub: {
-    color: colors.textMuted,
-    fontFamily: typography.fontFamily.medium,
-    fontSize: typography.size.xs,
-  },
-  timelineRow: {
-    flexDirection: 'row',
-    gap: 3,
-    height: 28,
-    alignItems: 'stretch',
-    marginBottom: spacing.sm,
-  },
-  timelineSeg: {
-    flex: 1,
-    borderRadius: radius.xs,
   },
   bulletRow: {
     flexDirection: 'row',
