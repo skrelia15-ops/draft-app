@@ -54,7 +54,7 @@ export const toastConfig: ToastConfig = {
   error: ({ text1, text2 }: BaseToastProps) => (
     <Row
       icon={<DangerCircle size={18} color={colors.textOnDark} />}
-      accent="#E5484D"
+      accent={colors.danger}
       text1={text1}
       text2={text2}
     />
