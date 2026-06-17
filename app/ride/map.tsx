@@ -1591,7 +1591,7 @@ const styles = StyleSheet.create({
     // sheet so the gate floats just over it with a clear gap.
     justifyContent: 'flex-end',
     backgroundColor:
-      Platform.OS === 'web' ? 'rgba(17,17,17,0.5)' : 'rgba(17,17,17,0.6)',
+      Platform.OS === 'web' ? 'rgba(17,17,17,0.5)' : colors.scrim,
   },
   permissionCard: {
     width: '100%',

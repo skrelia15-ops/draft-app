@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.hairlineStrong,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

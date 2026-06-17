@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
   },
   searchInput: {
     flex: 1,

@@ -32,7 +32,7 @@ const cardBase = {
   borderRadius: radius.xl,
   padding: spacing.md,
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.06)',
+  borderColor: colors.hairline,
 } as const;
 
 type CardProps = {
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius['3xl'],
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
   },
   elevatedCard: {
     ...cardBase,
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
   },
   statLabel: {
     color: colors.textMuted,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
     paddingHorizontal: spacing.sm,
     minHeight: 48,
     gap: spacing.xs,
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.hairlineStrong,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     minHeight: 52,
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.hairline,
   },
   segmentedPillActive: {
     backgroundColor: colors.primary,
