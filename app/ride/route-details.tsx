@@ -4,6 +4,7 @@ import {
     buildRoutePreview,
     deriveConditions,
     useRide,
+    type RouteShape,
 } from '@/lib/ride';
 import { useWeather } from '@/lib/weather';
 import {
@@ -300,16 +301,14 @@ function Tag({ icon, label }: { icon: React.ReactNode; label: string }) {
   );
 }
 
-function shapeBlurb(shape: ReturnType<typeof shapeLabel> extends string ? string : never): string {
-  switch (shape as string) {
-    case 'Loop':
+function shapeBlurb(shape: RouteShape): string {
+  switch (shape) {
+    case 'loop':
       return 'A closed circuit that returns you to the start. Best for fixed-time sessions and predictable drafting rotations.';
-    case 'Out & back':
+    case 'out-and-back':
       return 'Ride to a turnaround point and return the same way. Wind shift helps on one leg, hurts on the other — plan effort accordingly.';
-    case 'Point to point':
+    case 'point-to-point':
       return 'One-way ride that ends at a different location. Arrange your return or schedule pickup at the finish.';
-    default:
-      return '';
   }
 }
 
