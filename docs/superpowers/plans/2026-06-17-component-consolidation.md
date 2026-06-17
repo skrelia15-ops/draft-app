@@ -339,6 +339,14 @@ git add -A
 git commit -m "refactor(ui): use shared StatCard for matching stat blocks"
 ```
 
+> **Outcome (2026-06-17):** assessed all four call-sites against the shared `StatCard`.
+> NONE are pixel-identical — `goals.Stat` has no card chrome + reversed value/label
+> order + centered; `insights.CoreStat` uses `inactiveOnDark` border, `sm` padding and
+> `sm` value size; `profile` stat boxes are centered value-over-label. Migrating any of
+> them onto `StatCard` would change appearance, violating the zero-visual-change rule.
+> **T6 intentionally makes no code change** — unifying these is a visual-consistency
+> decision deferred to the feature/design phase.
+
 ---
 
 ## Task 7: `Tag` + `Chip` primitives + migrate
