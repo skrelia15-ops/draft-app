@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { colors, radius, spacing, typography } from '@/theme';
+import { colors, spacing, typography } from '@/theme';
+import { cardBase } from './_shared';
 
 type StatCardProps = {
   label: string;
@@ -22,11 +23,7 @@ export function StatCard({ label, value, context, accent, style }: StatCardProps
 
 const styles = StyleSheet.create({
   statCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.hairline,
+    ...cardBase,
   },
   statLabel: {
     color: colors.textMuted,
