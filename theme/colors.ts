@@ -32,6 +32,18 @@ export const colors = {
   inactiveOnLight: '#D9D9D9',
   inactiveOnPrimary: '#C9C16A',
 
+  // Status (semantic) — previously hardcoded as #3FBF6E/#F2A93B/#E5484D
+  success: '#3FBF6E',
+  warning: '#F2A93B',
+  danger: '#E5484D',
+
+  // Hairline borders on dark cards — previously rgba(255,255,255,0.06|0.08)
+  hairline: 'rgba(255,255,255,0.06)',
+  hairlineStrong: 'rgba(255,255,255,0.08)',
+
+  // Modal/overlay scrim — previously rgba(17,17,17,0.6)
+  scrim: 'rgba(17,17,17,0.6)',
+
   // Raw
   white: '#FFFFFF',
   black: '#111111',
