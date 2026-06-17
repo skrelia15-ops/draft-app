@@ -1,4 +1,4 @@
-import { IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
+import { AvatarRing, IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
 import {
   avatarSignedUrl,
   isDirectUri,
@@ -15,7 +15,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
     Alert,
-    Image,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -275,13 +274,14 @@ export default function ProfileSetupScreen() {
               pressed && styles.avatarWrapPressed,
             ]}
           >
-            <View style={styles.avatarRing}>
-              {displayUri ? (
-                <Image source={{ uri: displayUri }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              )}
-            </View>
+            <AvatarRing
+              uri={displayUri}
+              initials={initials}
+              size={AVATAR_SIZE}
+              ringColor={colors.hairlineStrong}
+              ringWidth={2}
+              initialsFontSize={typography.size['2xl']}
+            />
             <View style={styles.avatarEditBadge}>
               <Camera size={14} color={colors.textOnPrimary} />
             </View>
@@ -435,27 +435,6 @@ const styles = StyleSheet.create({
   },
   avatarWrapPressed: {
     opacity: 0.85,
-  },
-  avatarRing: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 2,
-    borderColor: colors.hairlineStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarInitials: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size['2xl'],
   },
   avatarEditBadge: {
     position: 'absolute',

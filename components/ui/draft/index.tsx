@@ -1,4 +1,5 @@
 export { ui } from './_shared';
+export { AvatarRing } from './AvatarRing';
 export { GoalsCard, buildGoalDays, type Goal } from './GoalsCard';
 export { TabBar, ElevatedCard, PrimaryCard, HighlightCard, ListItemCard, type CardProps } from './Card';
 export { StatCard } from './StatCard';

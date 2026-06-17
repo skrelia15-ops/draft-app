@@ -1,3 +1,4 @@
+import { AvatarRing } from '@/components/ui/draft';
 import { useAuth } from '@/lib/auth';
 import { hasAskedHealthAuth, isHealthAvailable, requestHealthAuth } from '@/lib/health';
 import { avatarSignedUrl, isDirectUri, useProfile } from '@/lib/profile';
@@ -14,7 +15,7 @@ import { Bolt } from '@solar-icons/react-native/Bold';
 import { Bicycling, Logout3, Tuning } from '@solar-icons/react-native/Linear';
 import { Href, router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const TAB_BAR_SAFE_AREA = 110;
 
@@ -134,18 +135,13 @@ export default function ProfileScreen() {
       >
       <View style={styles.headerRow}>
         <View style={styles.avatarWrap}>
-          <View style={styles.avatarRing}>
-            {avatarDisplayUri ? (
-              <Image
-                source={{ uri: avatarDisplayUri }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <Text style={styles.avatarInitials}>
-                {avatarInitials(profile.name)}
-              </Text>
-            )}
-          </View>
+          <AvatarRing
+            uri={avatarDisplayUri}
+            initials={avatarInitials(profile.name)}
+            size={80}
+            initialsFontSize={typography.size.xl}
+            initialsLetterSpacing={typography.letterSpacing.wide}
+          />
           <View style={styles.avatarBadge}>
             <Bolt size={14} color={colors.textOnPrimary} />
           </View>
@@ -343,28 +339,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 80,
     height: 80,
-  },
-  avatarRing: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.pill,
-    borderWidth: 3,
-    borderColor: colors.primary,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarInitials: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.extrabold,
-    fontStyle: 'italic',
-    fontSize: typography.size.xl,
-    letterSpacing: typography.letterSpacing.wide,
   },
   avatarBadge: {
     position: 'absolute',
