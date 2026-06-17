@@ -3,8 +3,6 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '@/theme';
 
-import type { Field } from './types';
-
 export function InputRow({
   inputRef,
   value,
@@ -18,7 +16,6 @@ export function InputRow({
   onPickOnMap,
   showClear,
 }: {
-  which: Field;
   inputRef: React.RefObject<TextInput | null>;
   value: string;
   placeholder: string;

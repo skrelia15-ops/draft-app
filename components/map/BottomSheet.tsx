@@ -84,7 +84,6 @@ export function BottomSheet(props: BottomSheetProps) {
 
         {/* FROM input */}
         <InputRow
-          which="origin"
           inputRef={originInputRef}
           value={origin.query}
           placeholder="Choose origin"
@@ -126,7 +125,6 @@ export function BottomSheet(props: BottomSheetProps) {
 
         {/* TO input */}
         <InputRow
-          which="destination"
           inputRef={destInputRef}
           value={destination.query}
           placeholder="Where to?"
