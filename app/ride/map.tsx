@@ -46,7 +46,9 @@ import {
   type RouteResult,
 } from '@/lib/maps';
 import {
+  draftPotentialColor,
   getNearbyRiders,
+  trafficLevelColor,
   useRide,
   type DraftPotential,
 } from '@/lib/ride';
@@ -475,7 +477,7 @@ export default function RideMapScreen() {
                 <View
                   style={[
                     styles.riderDot,
-                    { backgroundColor: riderColor(rider.potential) },
+                    { backgroundColor: draftPotentialColor(rider.potential) },
                   ]}
                 />
                 <Text style={styles.riderLabel}>{rider.name}</Text>
@@ -682,13 +684,6 @@ function offsetCoords(
       Math.cos(d) - Math.sin(lat1) * Math.sin(lat2),
     );
   return { latitude: (lat2 * 180) / Math.PI, longitude: (lon2 * 180) / Math.PI };
-}
-
-/** Status hue for a rider's draft potential — same vocabulary as Home. */
-function riderColor(potential: DraftPotential): string {
-  if (potential === 'HIGH') return '#3FBF6E';
-  if (potential === 'MEDIUM') return '#F2A93B';
-  return colors.textMuted;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1057,9 +1052,7 @@ function RouteSummary({
   const traffic = useMemo(() => {
     if (routeState.kind !== 'ready' || !routeState.route.trafficLevel) return null;
     const level = routeState.route.trafficLevel;
-    if (level === 'CLEAR') return { level, color: '#3FBF6E' };
-    if (level === 'MODERATE') return { level, color: '#F2A93B' };
-    return { level, color: '#E5484D' };
+    return { level, color: trafficLevelColor(level) };
   }, [routeState]);
 
   if (routeState.kind === 'loading') {

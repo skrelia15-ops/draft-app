@@ -2,6 +2,7 @@ import { useUserLocation } from '@/hooks/useUserLocation';
 import {
     clusterNearbyRiders,
     deriveConditions,
+    draftPotentialColor,
     getCompatibility,
     getNearbyRiders,
     useRide,
@@ -229,7 +230,7 @@ function RiderClusterRow({
   cluster: RiderCluster;
   onPress: () => void;
 }) {
-  const tone = potentialColor(cluster.potential);
+  const tone = draftPotentialColor(cluster.potential);
   return (
     <Pressable style={styles.clusterRow} onPress={onPress}>
       <View style={styles.clusterIcon}>
@@ -265,18 +266,6 @@ function CompatBar({ label, value }: { label: string; value: number }) {
       <Text style={styles.compatBarValue}>{value}</Text>
     </View>
   );
-}
-
-/**
- * Status tone for a nearby rider's draft potential. Three discrete
- * hues — green (great match), amber (decent), muted (weak) — same
- * vocabulary used by the LIVE badge on Groups so users learn one
- * colour system instead of two.
- */
-function potentialColor(p: DraftPotential): string {
-  if (p === 'HIGH') return '#3FBF6E';
-  if (p === 'MEDIUM') return '#F2A93B';
-  return colors.textMuted;
 }
 
 /**

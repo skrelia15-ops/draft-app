@@ -17,6 +17,7 @@ export { buildRoutePreview } from './sampleRoutes';
 export type { RouteShape } from './sampleRoutes';
 export { trafficWeight } from './utils';
 export type { TrafficLevel } from './utils';
+export { draftPotentialColor, trafficLevelColor } from './statusColor';
 export {
   formatDistanceMeters,
   formatHourMin,
