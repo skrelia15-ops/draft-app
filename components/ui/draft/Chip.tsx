@@ -1,15 +1,9 @@
 import { colors, radius, spacing, typography } from '@/theme';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-export function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+type ChipProps = { label: string; active: boolean; onPress: () => void };
+
+export function Chip({ label, active, onPress }: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
