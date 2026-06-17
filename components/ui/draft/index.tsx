@@ -7,3 +7,5 @@ export { IconButton } from './IconButton';
 export { InputField } from './InputField';
 export { PrimaryButton, SecondaryButton } from './Button';
 export { SegmentedTabs, SegmentedProgress } from './Segmented';
+export { Tag } from './Tag';
+export { Chip } from './Chip';

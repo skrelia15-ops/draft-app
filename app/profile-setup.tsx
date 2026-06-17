@@ -1,4 +1,4 @@
-import { AvatarRing, IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
+import { AvatarRing, Chip, IconButton, InputField, PrimaryButton } from '@/components/ui/draft';
 import {
   avatarSignedUrl,
   isDirectUri,
@@ -299,22 +299,14 @@ export default function ProfileSetupScreen() {
 
         <Text style={styles.label}>SKILL LEVEL</Text>
         <View style={styles.chipsRow}>
-          {SKILL_LEVELS.map((level) => {
-            const active = skill === level;
-            return (
-              <Pressable
-                key={level}
-                onPress={() => setSkill(level)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {level}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {SKILL_LEVELS.map((level) => (
+            <Chip
+              key={level}
+              label={level}
+              active={skill === level}
+              onPress={() => setSkill(level)}
+            />
+          ))}
         </View>
 
         <InputField
@@ -350,22 +342,14 @@ export default function ProfileSetupScreen() {
 
         <Text style={styles.label}>BIKE TYPE</Text>
         <View style={styles.chipsRow}>
-          {BIKE_TYPES.map((type) => {
-            const active = bikeType === type;
-            return (
-              <Pressable
-                key={type}
-                onPress={() => setBikeType(type)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {type}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {BIKE_TYPES.map((type) => (
+            <Chip
+              key={type}
+              label={type}
+              active={bikeType === type}
+              onPress={() => setBikeType(type)}
+            />
+          ))}
         </View>
 
         <InputField
@@ -472,26 +456,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  chip: {
-    flexGrow: 1,
-    flexBasis: '22%',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceElevated,
-    alignItems: 'center',
-  },
-  chipActive: {
-    backgroundColor: colors.primary,
-  },
-  chipText: {
-    color: colors.textOnDark,
-    fontFamily: typography.fontFamily.semibold,
-    fontSize: typography.size.sm,
-  },
-  chipTextActive: {
-    color: colors.textOnPrimary,
   },
   // Bike section
   sectionDivider: {
