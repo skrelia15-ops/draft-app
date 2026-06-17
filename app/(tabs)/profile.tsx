@@ -152,8 +152,14 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.headerInfo}>
-          <Text style={styles.name}>{first}</Text>
-          {last ? <Text style={styles.name}>{last}</Text> : null}
+          <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {first}
+          </Text>
+          {last ? (
+            <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              {last}
+            </Text>
+          ) : null}
           <View style={styles.levelRow}>
             <Text style={styles.levelHighlight}>
               {compatibility.tier} DRAFTER

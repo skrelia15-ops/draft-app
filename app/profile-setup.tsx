@@ -191,9 +191,18 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync(pickerOptions);
-    if (!result.canceled) {
-      setAvatarUri(result.assets[0].uri);
+    // The camera is unavailable on the iOS Simulator (and can throw on
+    // devices without one) — `launchCameraAsync` rejects instead of
+    // returning, so guard it and surface a toast rather than a redbox.
+    try {
+      const result = await ImagePicker.launchCameraAsync(pickerOptions);
+      if (!result.canceled) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch {
+      toast.error('Camera unavailable', {
+        text2: 'No camera here — choose a photo from your library instead.',
+      });
     }
   };
 
@@ -207,18 +216,35 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
-    if (!result.canceled) {
-      setAvatarUri(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync(pickerOptions);
+      if (!result.canceled) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch {
+      toast.error('Could not open library', {
+        text2: 'Something went wrong picking a photo. Try again.',
+      });
     }
   };
 
+  const removePhoto = () => setAvatarUri(null);
+
   const handleChooseAvatar = () => {
-    Alert.alert('Change photo', 'Choose a source for your profile picture.', [
+    // Offer "Remove photo" only when there's an avatar to clear.
+    const options = [
       { text: 'Take Photo', onPress: takePhoto },
       { text: 'Choose from Library', onPress: pickFromLibrary },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+      ...(avatarUri
+        ? [{
+            text: 'Remove Photo',
+            style: 'destructive' as const,
+            onPress: removePhoto,
+          }]
+        : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ];
+    Alert.alert('Change photo', 'Choose a source for your profile picture.', options);
   };
 
   return (
