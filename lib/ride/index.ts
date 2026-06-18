@@ -31,3 +31,12 @@ export type {
   RideRecord,
   RideLiveStats,
 } from './types';
+export { scoreTodayFit } from './todayFit';
+export type { TodayFit, FitReason, FitContext } from './todayFit';
+export {
+  dominantBearing, compassToBearing,
+  catalogToCandidate, loopToCandidate, directionsToCandidate,
+} from './routeCandidate';
+export type { RouteCandidate } from './routeCandidate';
+export { recommendRoutes } from './recommend';
+export type { Recommendation } from './recommend';
