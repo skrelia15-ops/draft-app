@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { trafficLevelColor } from '@/lib/ride';
+import { trafficLevelColor, type TodayFit } from '@/lib/ride';
 import { colors, radius, spacing, typography } from '@/theme';
 
 import type { RouteState } from './types';
@@ -9,9 +9,11 @@ import type { RouteState } from './types';
 export function RouteSummary({
   routeState,
   trafficVisible,
+  todayFit,
 }: {
   routeState: RouteState;
   trafficVisible: boolean;
+  todayFit: TodayFit | null;
 }) {
   /**
    * Traffic level inferred from the duration_in_traffic / duration ratio.
@@ -68,6 +70,11 @@ export function RouteSummary({
       </View>
 
       <View style={styles.metaRow}>
+        {todayFit && (
+          <View style={styles.fitBadge}>
+            <Text style={styles.fitText}>TODAY FIT · {todayFit.score}%</Text>
+          </View>
+        )}
         {traffic && (
           <View style={styles.trafficBadge}>
             <View style={[styles.trafficDot, { backgroundColor: traffic.color }]} />
@@ -167,6 +174,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: radius.pill,
+  },
+  fitBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing['2xs'],
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  fitText: {
+    color: colors.textOnPrimary,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
   },
   trafficText: {
     color: colors.textOnDark,

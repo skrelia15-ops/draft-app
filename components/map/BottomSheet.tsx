@@ -6,6 +6,7 @@ import {
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { PlacePrediction } from '@/lib/maps';
+import type { TodayFit } from '@/lib/ride';
 import { colors, radius, spacing, typography } from '@/theme';
 
 import { InputRow } from './InputRow';
@@ -23,6 +24,8 @@ export type BottomSheetProps = {
   showPredictions: boolean;
   showRouteSummary: boolean;
   routeState: RouteState;
+  /** Today Fit score for the built route (mode B), or null. */
+  todayFit: TodayFit | null;
   navigating: boolean;
   trafficVisible: boolean;
   originInputRef: React.RefObject<TextInput | null>;
@@ -49,6 +52,7 @@ export function BottomSheet(props: BottomSheetProps) {
     showPredictions,
     showRouteSummary,
     routeState,
+    todayFit,
     navigating,
     trafficVisible,
     originInputRef,
@@ -153,7 +157,7 @@ export function BottomSheet(props: BottomSheetProps) {
         {showRouteSummary && (
           <>
             <View style={styles.summarySpacer} />
-            <RouteSummary routeState={routeState} trafficVisible={trafficVisible} />
+            <RouteSummary routeState={routeState} trafficVisible={trafficVisible} todayFit={todayFit} />
             {routeState.kind === 'error' && (
               <View style={styles.errorRow}>
                 <DangerCircle size={16} color={colors.primary} />

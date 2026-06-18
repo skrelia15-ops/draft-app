@@ -49,7 +49,7 @@ import {
   deriveConditions,
   directionsToCandidate,
   scoreTodayFit,
-  type Recommendation,
+  type TodayFit,
 } from '@/lib/ride';
 import { useWeather } from '@/lib/weather';
 import { useProfile } from '@/lib/profile';
@@ -98,8 +98,6 @@ export default function RideMapScreen() {
   );
 
   const [smartOpen, setSmartOpen] = useState(false);
-  const [destRecs, setDestRecs] = useState<Recommendation[] | null>(null);
-  const [destLoading, setDestLoading] = useState(false);
 
   const [origin, setOrigin] = useState<Endpoint>(EMPTY_ENDPOINT);
   const [destination, setDestination] = useState<Endpoint>(EMPTY_ENDPOINT);
@@ -193,26 +191,18 @@ export default function RideMapScreen() {
     insets.bottom,
   ]);
 
-  // ── Smart panel (mode B): derive a destination recommendation from the
-  // manual planner's directions result while the panel is open.
-  useEffect(() => {
-    if (!smartOpen) return;
-    if (routeState.kind === 'ready') {
-      const cand = directionsToCandidate(routeState.route, {
-        id: 'dest-best', name: destination.query || 'Your route',
-        difficulty: 'MODERATE', paceKmh: profile.avgPaceKmh,
-      });
-      const fit = scoreTodayFit(cand, { conditions, profile });
-      setDestRecs([{ candidate: cand, fit }]);
-      setDestLoading(false);
-    } else if (routeState.kind === 'loading') {
-      setDestLoading(true);
-    } else {
-      // 'idle' or 'error' — stop the spinner; drop stale results when idle.
-      setDestLoading(false);
-      if (routeState.kind === 'idle') setDestRecs(null);
+  // ── Today Fit for the manually-planned route (mode B): score the built
+  // directions so the route summary can surface a fit %.
+  const routeFit = useMemo<TodayFit | null>(() => {
+    if (routeState.kind !== 'ready' || routeState.route.coordinates.length === 0) {
+      return null;
     }
-  }, [smartOpen, routeState, destination.query, profile, conditions]);
+    const cand = directionsToCandidate(routeState.route, {
+      id: 'manual', name: destination.query || 'Your route',
+      difficulty: 'MODERATE', paceKmh: profile.avgPaceKmh,
+    });
+    return scoreTodayFit(cand, { conditions, profile });
+  }, [routeState, destination.query, profile, conditions]);
 
   // ── Autocomplete (debounced) — driven by the active input's query.
   useEffect(() => {
@@ -627,30 +617,33 @@ export default function RideMapScreen() {
         />
       )}
 
-      <BottomSheet
-        insetBottom={insets.bottom}
-        origin={origin}
-        destination={destination}
-        activeField={activeField}
-        predictions={predictions}
-        searching={searching}
-        showPredictions={showPredictions}
-        showRouteSummary={showRouteSummary}
-        routeState={routeState}
-        navigating={navigating}
-        trafficVisible={trafficVisible}
-        originInputRef={originInputRef}
-        destInputRef={destInputRef}
-        onFocusField={setActiveField}
-        onChangeQuery={handleQueryChange}
-        onClearField={handleClearField}
-        onSelectPrediction={handleSelectPrediction}
-        onPickOnMap={handleEnterPickOnMap}
-        onSwap={handleSwap}
-        onStart={handleStartRide}
-        onRetryRoute={handleRetryRoute}
-        onLayout={setSheetHeight}
-      />
+      {!smartOpen && (
+        <BottomSheet
+          insetBottom={insets.bottom}
+          origin={origin}
+          destination={destination}
+          activeField={activeField}
+          predictions={predictions}
+          searching={searching}
+          showPredictions={showPredictions}
+          showRouteSummary={showRouteSummary}
+          routeState={routeState}
+          todayFit={routeFit}
+          navigating={navigating}
+          trafficVisible={trafficVisible}
+          originInputRef={originInputRef}
+          destInputRef={destInputRef}
+          onFocusField={setActiveField}
+          onChangeQuery={handleQueryChange}
+          onClearField={handleClearField}
+          onSelectPrediction={handleSelectPrediction}
+          onPickOnMap={handleEnterPickOnMap}
+          onSwap={handleSwap}
+          onStart={handleStartRide}
+          onRetryRoute={handleRetryRoute}
+          onLayout={setSheetHeight}
+        />
+      )}
 
       {!smartOpen && !navigating && (
         <View
@@ -676,9 +669,12 @@ export default function RideMapScreen() {
             origin={origin.coords}
             conditions={conditions}
             profile={profile}
-            destinationRecs={destRecs}
-            destinationLoading={destLoading}
-            onRequestDestination={() => destInputRef.current?.focus()}
+            onChooseDestination={() => {
+              // B = manual planner: close the panel and focus the destination
+              // field so the rider plans A→B normally (with a Today Fit chip).
+              setSmartOpen(false);
+              setTimeout(() => destInputRef.current?.focus(), 50);
+            }}
             onStart={(candidate) => {
               setSmartOpen(false);
               startRide({
