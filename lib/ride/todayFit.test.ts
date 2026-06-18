@@ -60,3 +60,16 @@ test('score is clamped 0–100 and tier follows bands', () => {
   expect(r.score).toBeLessThanOrEqual(100);
   expect(['GREAT', 'GOOD', 'FAIR', 'POOR']).toContain(r.tier);
 });
+
+test('difficulty gap isolated: harder-than-skill scores below an exact match', () => {
+  // hold skill fixed (Pro), vary only difficulty: MODERATE (gap 0) vs HARD (gap 1)
+  const match = scoreTodayFit(candidate({ difficulty: 'MODERATE' }), { conditions: conditions(), profile: PROFILE });
+  const harder = scoreTodayFit(candidate({ difficulty: 'HARD' }), { conditions: conditions(), profile: PROFILE });
+  expect(harder.score).toBeLessThan(match.score);
+});
+
+test('headwind route surfaces a non-good wind reason', () => {
+  // wind FROM north → blows toward south (180). A northbound route (bearing 0) faces a headwind.
+  const head = scoreTodayFit(candidate({ shape: 'out-and-back', bearing: 0 }), { conditions: conditions(), profile: PROFILE });
+  expect(head.reasons.some((r) => r.kind === 'wind' && !r.good)).toBe(true);
+});
