@@ -1,4 +1,4 @@
-import { dominantBearing, compassToBearing, catalogToCandidate, loopToCandidate } from './routeCandidate';
+import { dominantBearing, compassToBearing, catalogToCandidate, loopToCandidate, directionsToCandidate } from './routeCandidate';
 import type { CatalogRoute } from '@/lib/routes';
 
 const ODESSA = { latitude: 46.4825, longitude: 30.7233 };
@@ -44,4 +44,26 @@ test('loopToCandidate generates a loop candidate near origin', () => {
   expect(c.shape).toBe('loop');
   expect(c.distanceKm).toBe(12);
   expect(c.coordinates.length).toBeGreaterThan(2);
+  expect(c.origin).toEqual(ODESSA);
+  expect(c.destination).toEqual(ODESSA);
+});
+
+test('directionsToCandidate maps a directions result, rounds distance, sets ends', () => {
+  const coords = [
+    { latitude: 46.48, longitude: 30.72 },
+    { latitude: 46.49, longitude: 30.74 },
+    { latitude: 46.50, longitude: 30.76 },
+  ];
+  const route = { coordinates: coords, distanceMeters: 12340 } as any;
+  const c = directionsToCandidate(route, { id: 'd1', name: 'To work', difficulty: 'MODERATE', paceKmh: 28 });
+  expect(c.source).toBe('directions');
+  expect(c.shape).toBe('point-to-point');
+  expect(c.distanceKm).toBe(12.3);
+  expect(c.origin).toEqual(coords[0]);
+  expect(c.destination).toEqual(coords[coords.length - 1]);
+});
+
+test('directionsToCandidate throws on empty coordinates', () => {
+  const route = { coordinates: [], distanceMeters: 0 } as any;
+  expect(() => directionsToCandidate(route, { id: 'x', name: 'x', difficulty: 'EASY', paceKmh: 20 })).toThrow();
 });

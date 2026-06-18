@@ -34,7 +34,7 @@ export function compassToBearing(c: CompassDirection): number {
 export function dominantBearing(coords: LatLng[]): number {
   if (coords.length < 2) return 0;
   const a = coords[0];
-  const b = coords[Math.floor(coords.length / 2)] ?? coords[coords.length - 1];
+  const b = coords[Math.floor(coords.length / 2)];
   const φ1 = (a.latitude * Math.PI) / 180;
   const φ2 = (b.latitude * Math.PI) / 180;
   const Δλ = ((b.longitude - a.longitude) * Math.PI) / 180;
@@ -76,6 +76,9 @@ export function directionsToCandidate(route: RouteResult, opts: {
   id: string; name: string; difficulty: Difficulty; paceKmh: number;
 }): RouteCandidate {
   const coords = route.coordinates;
+  if (coords.length === 0) {
+    throw new Error('directionsToCandidate: route has no coordinates');
+  }
   return {
     id: opts.id, name: opts.name, shape: 'point-to-point',
     distanceKm: Math.round((route.distanceMeters / 1000) * 10) / 10,
