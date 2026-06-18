@@ -25,32 +25,13 @@ export default function CompleteScreen() {
   // so we never crash.
   const distance = lastFinished?.distanceMeters ?? 0;
   const duration = lastFinished?.durationSec ?? 0;
-  const energyPercent = lastFinished?.energySavedPercent ?? 0;
   const tooShort = distance < MIN_USEFUL_DISTANCE_M;
 
+  // Complete shows just the two headline numbers — the full breakdown
+  // (energy saved, heart rate, calories, drafting) lives on Insights.
   const stats = [
     { label: 'DISTANCE', value: formatDistanceMeters(distance) },
     { label: 'TIME', value: formatHourMin(duration) },
-    {
-      label: 'ENERGY SAVED',
-      // Don't quote a nonsensical 30% energy saved for a 0m ride — the
-      // sample buffer is too small to draw any conclusion.
-      value: tooShort ? '—' : `${energyPercent}%`,
-    },
-    {
-      label: 'AVG HR',
-      value:
-        lastFinished?.health?.avgHeartRate != null
-          ? `${lastFinished.health.avgHeartRate} bpm`
-          : '—',
-    },
-    {
-      label: 'CALORIES',
-      value:
-        lastFinished?.health?.activeCalories != null
-          ? `${lastFinished.health.activeCalories} kcal`
-          : '—',
-    },
   ];
 
   const goHome = () => {
@@ -159,7 +140,8 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    gap: spacing['4xl'],
     width: '100%',
     paddingHorizontal: spacing.lg,
   },

@@ -72,16 +72,6 @@ export default function InsightsScreen() {
           This ride was too short to analyze. Try a longer route to unlock
           drafting and energy stats.
         </Text>
-        <View style={[styles.coreStatsGrid, { marginTop: spacing.xl }]}>
-          <CoreStat
-            label="Distance"
-            value={formatDistanceMeters(lastFinished.distanceMeters)}
-          />
-          <CoreStat
-            label="Total time"
-            value={formatHourMin(lastFinished.durationSec)}
-          />
-        </View>
         <Pressable
           style={[styles.dashboardButton, { marginTop: spacing.xl }]}
           onPress={handleGoHome}
