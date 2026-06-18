@@ -207,6 +207,10 @@ export default function RideMapScreen() {
       setDestLoading(false);
     } else if (routeState.kind === 'loading') {
       setDestLoading(true);
+    } else {
+      // 'idle' or 'error' — stop the spinner; drop stale results when idle.
+      setDestLoading(false);
+      if (routeState.kind === 'idle') setDestRecs(null);
     }
   }, [smartOpen, routeState, destination.query, profile, conditions]);
 
