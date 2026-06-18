@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
+import { Bolt } from '@solar-icons/react-native/Bold';
 import { colors, radius, spacing, typography } from '@/theme';
 
 /** Floating pill above the manual sheet that opens the smart route panel. */
@@ -10,7 +11,7 @@ export function SmartBanner({ onPress }: { onPress: () => void }) {
       accessibilityLabel="Suggest a route for today"
       style={({ pressed }) => [styles.banner, pressed && styles.pressed]}
     >
-      <Text style={styles.spark}>✨</Text>
+      <Bolt size={16} color={colors.primary} />
       <Text style={styles.label}>Suggest today's ride</Text>
     </Pressable>
   );
@@ -18,7 +19,7 @@ export function SmartBanner({ onPress }: { onPress: () => void }) {
 
 const styles = StyleSheet.create({
   banner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
     alignSelf: 'center', paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     borderRadius: radius.pill, backgroundColor: colors.surfaceElevated,
     borderWidth: 1, borderColor: colors.primary,
@@ -26,7 +27,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, elevation: 6,
   },
   pressed: { opacity: 0.9 },
-  spark: { fontSize: typography.size.sm },
   label: {
     color: colors.textOnDark, fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs, letterSpacing: typography.letterSpacing.wide,

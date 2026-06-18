@@ -22,7 +22,7 @@ function windFactor(c: RouteCandidate, cond: Conditions): { score: number; reaso
     const good = cond.draftLabel === 'OPTIMAL' || cond.draftLabel === 'GOOD';
     return {
       score: cond.draftIndex,
-      reason: good ? { kind: 'wind', good: true, text: 'good drafting wind' } : null,
+      reason: good ? { kind: 'wind', good: true, text: 'Good wind' } : null,
     };
   }
   const blowingTo = (compassToBearing(cond.windFrom) + 180) % 360;
@@ -30,8 +30,8 @@ function windFactor(c: RouteCandidate, cond: Conditions): { score: number; reaso
   const align = (90 - diff) / 90;
   const score = clamp(cond.draftIndex + align * 15);
   let reason: FitReason | null = null;
-  if (align > 0.4) reason = { kind: 'wind', good: true, text: 'tailwind on the way out' };
-  else if (align < -0.4) reason = { kind: 'wind', good: false, text: 'headwind section' };
+  if (align > 0.4) reason = { kind: 'wind', good: true, text: 'Tailwind' };
+  else if (align < -0.4) reason = { kind: 'wind', good: false, text: 'Headwind' };
   return { score, reason };
 }
 
@@ -40,9 +40,9 @@ function difficultyFactor(c: RouteCandidate, p: Profile): { score: number; reaso
   const table: Record<number, number> = { 0: 100, 1: 70, [-1]: 80, 2: 35, [-2]: 65 };
   const score = table[gap] ?? 50;
   let reason: FitReason | null = null;
-  if (gap === 0) reason = { kind: 'difficulty', good: true, text: `matches your ${p.skillLevel} level` };
-  else if (gap >= 1) reason = { kind: 'difficulty', good: false, text: 'a step harder than your level' };
-  else reason = { kind: 'difficulty', good: true, text: 'comfortable for you' };
+  if (gap === 0) reason = { kind: 'difficulty', good: true, text: `Your ${p.skillLevel} level` };
+  else if (gap >= 1) reason = { kind: 'difficulty', good: false, text: 'A bit harder' };
+  else reason = { kind: 'difficulty', good: true, text: 'Comfortable' };
   return { score, reason };
 }
 
