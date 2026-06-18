@@ -3,8 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import MapView, { Polyline } from 'react-native-maps';
 import { Chip, Tag } from '@/components/ui/draft';
 import { darkMapStyle, MAP_PROVIDER, type LatLng } from '@/lib/maps';
-import { recommendRoutes, type Recommendation, type RouteCandidate } from '@/lib/ride';
-import type { Conditions } from '@/lib/ride';
+import { recommendRoutes, type Recommendation, type RouteCandidate, type Conditions } from '@/lib/ride';
 import type { CatalogRoute } from '@/lib/routes';
 import type { Profile } from '@/lib/profile';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -48,11 +47,11 @@ export function SmartPanel(props: SmartPanelProps) {
 
       {mode === 'choose' && (
         <View style={styles.chooseRow}>
-          <Pressable style={styles.choice} onPress={() => { setMode('destination'); props.onRequestDestination(); }}>
+          <Pressable style={styles.choice} onPress={() => { setMode('destination'); props.onRequestDestination(); }} accessibilityRole="button" accessibilityLabel="I have a destination">
             <Text style={styles.choiceIcon}>📍</Text>
             <Text style={styles.choiceLabel}>I have a destination</Text>
           </Pressable>
-          <Pressable style={[styles.choice, styles.choiceAccent]} onPress={() => setMode('recommend')}>
+          <Pressable style={[styles.choice, styles.choiceAccent]} onPress={() => setMode('recommend')} accessibilityRole="button" accessibilityLabel="Recommend a route">
             <Text style={styles.choiceIcon}>✨</Text>
             <Text style={[styles.choiceLabel, styles.choiceLabelAccent]}>Recommend a route</Text>
           </Pressable>
@@ -123,8 +122,8 @@ function ResultCard({ rec, best, onPress }: { rec: Recommendation; best: boolean
         </View>
         <Text style={styles.cardMeta}>{candidate.distanceKm} km · {candidate.shape}</Text>
         <View style={styles.reasons}>
-          {fit.reasons.map((reason, i) => (
-            <Tag key={i} icon={<View style={[styles.reasonDot, { backgroundColor: reason.good ? colors.success : colors.warning }]} />} label={reason.text} />
+          {fit.reasons.map((reason) => (
+            <Tag key={reason.kind} icon={<View style={[styles.reasonDot, { backgroundColor: reason.good ? colors.success : colors.warning }]} />} label={reason.text} />
           ))}
         </View>
       </View>
@@ -133,6 +132,7 @@ function ResultCard({ rec, best, onPress }: { rec: Recommendation; best: boolean
 }
 
 function regionFor(coords: LatLng[]) {
+  if (coords.length === 0) return { latitude: 0, longitude: 0, latitudeDelta: 0.1, longitudeDelta: 0.1 };
   const lats = coords.map((c) => c.latitude), lngs = coords.map((c) => c.longitude);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats), minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
   return {
