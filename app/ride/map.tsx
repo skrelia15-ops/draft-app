@@ -25,6 +25,8 @@ import MapView, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomSheet } from '@/components/map/BottomSheet';
+import { SmartBanner } from '@/components/map/SmartBanner';
+import { SmartPanel } from '@/components/map/SmartPanel';
 import { compassBearing, offsetCoords } from '@/components/map/markers';
 import { PermissionGate } from '@/components/map/PermissionGate';
 import { EMPTY_ENDPOINT, type Endpoint, type Field, type RouteState } from '@/components/map/types';
@@ -44,7 +46,14 @@ import {
   draftPotentialColor,
   getNearbyRiders,
   useRide,
+  deriveConditions,
+  directionsToCandidate,
+  scoreTodayFit,
+  type Recommendation,
 } from '@/lib/ride';
+import { useWeather } from '@/lib/weather';
+import { useProfile } from '@/lib/profile';
+import { useRoutes } from '@/lib/routes';
 import { colors, radius, spacing, typography } from '@/theme';
 
 /**
@@ -61,6 +70,11 @@ const FALLBACK_REGION: Region = {
 
 const SEARCH_DEBOUNCE_MS = 250;
 
+const FALLBACK_WEATHER_SMART = {
+  windKmh: 0, windDeg: 0, windFrom: 'N' as const, tempC: 0, feelsLikeC: 0,
+  isRaining: false, rainMmLastHour: 0, observedAt: 0,
+};
+
 export default function RideMapScreen() {
   const insets = useSafeAreaInsets();
   const { startRide } = useRide();
@@ -74,6 +88,18 @@ export default function RideMapScreen() {
 
   const { status: locStatus, coords, errorMessage: locError, retry } =
     useUserLocation();
+
+  const { weather } = useWeather();
+  const { profile } = useProfile();
+  const { routes: catalog } = useRoutes();
+  const conditions = useMemo(
+    () => deriveConditions(weather ?? FALLBACK_WEATHER_SMART),
+    [weather],
+  );
+
+  const [smartOpen, setSmartOpen] = useState(false);
+  const [destRecs, setDestRecs] = useState<Recommendation[] | null>(null);
+  const [destLoading, setDestLoading] = useState(false);
 
   const [origin, setOrigin] = useState<Endpoint>(EMPTY_ENDPOINT);
   const [destination, setDestination] = useState<Endpoint>(EMPTY_ENDPOINT);
@@ -166,6 +192,23 @@ export default function RideMapScreen() {
     insets.top,
     insets.bottom,
   ]);
+
+  // ── Smart panel (mode B): derive a destination recommendation from the
+  // manual planner's directions result while the panel is open.
+  useEffect(() => {
+    if (!smartOpen) return;
+    if (routeState.kind === 'ready') {
+      const cand = directionsToCandidate(routeState.route, {
+        id: 'dest-best', name: destination.query || 'Your route',
+        difficulty: 'MODERATE', paceKmh: profile.avgPaceKmh,
+      });
+      const fit = scoreTodayFit(cand, { conditions, profile });
+      setDestRecs([{ candidate: cand, fit }]);
+      setDestLoading(false);
+    } else if (routeState.kind === 'loading') {
+      setDestLoading(true);
+    }
+  }, [smartOpen, routeState, destination.query, profile, conditions]);
 
   // ── Autocomplete (debounced) — driven by the active input's query.
   useEffect(() => {
@@ -604,6 +647,51 @@ export default function RideMapScreen() {
         onRetryRoute={handleRetryRoute}
         onLayout={setSheetHeight}
       />
+
+      {!smartOpen && !navigating && (
+        <View
+          style={[
+            styles.smartBannerWrap,
+            { bottom: insets.bottom + sheetHeight + spacing.md },
+          ]}
+          pointerEvents="box-none"
+        >
+          <SmartBanner onPress={() => setSmartOpen(true)} />
+        </View>
+      )}
+      {smartOpen && (
+        <View
+          style={[
+            styles.smartPanelWrap,
+            { paddingBottom: Math.max(insets.bottom, spacing.sm) },
+          ]}
+          pointerEvents="box-none"
+        >
+          <SmartPanel
+            catalog={catalog}
+            origin={origin.coords}
+            conditions={conditions}
+            profile={profile}
+            destinationRecs={destRecs}
+            destinationLoading={destLoading}
+            onRequestDestination={() => destInputRef.current?.focus()}
+            onStart={(candidate) => {
+              setSmartOpen(false);
+              startRide({
+                routeName: candidate.name,
+                routeCoordinates: candidate.coordinates,
+                routeDistanceMeters: candidate.distanceKm * 1000,
+                origin: candidate.origin,
+                destination: candidate.destination,
+                fallbackPaceKmh: candidate.paceKmh,
+              });
+              toast.success('Ride started', { text2: `${candidate.distanceKm} km route` });
+              router.push('/ride/active' as Href);
+            }}
+            onClose={() => setSmartOpen(false)}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -704,6 +792,10 @@ const styles = StyleSheet.create({
   sideButtonDisabled: {
     opacity: 0.5,
   },
+
+  // Smart route planning banner + panel
+  smartBannerWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  smartPanelWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg },
   // Nearby-rider markers — small coloured dot + handle, low visual
   // weight so they read as ambient context, not waypoints.
   riderMarker: {
