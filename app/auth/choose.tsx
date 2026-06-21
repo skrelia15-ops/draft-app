@@ -24,6 +24,18 @@ function isCancellation(e: any): boolean {
   );
 }
 
+/**
+ * Apple Sign In stays hidden until there's an Apple Developer Program
+ * membership with the "Sign in with Apple" capability. Set
+ * EXPO_PUBLIC_APPLE_AUTH_ENABLED="true" (and rebuild — it also toggles the
+ * native entitlement in app.config.ts) to bring the button back. Note: App
+ * Store review requires Sign in with Apple once Google sign-in is offered, so
+ * this must be enabled before a public launch.
+ */
+const APPLE_AUTH_ENABLED =
+  Platform.OS === 'ios' &&
+  process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED === 'true';
+
 export default function ChooseAuthScreen() {
   const { signInWithApple, signInWithGoogle } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -35,6 +47,14 @@ export default function ChooseAuthScreen() {
       await fn();
     } catch (e: any) {
       if (!isCancellation(e)) {
+        if (__DEV__) {
+          console.warn(
+            '[auth] social sign-in failed →',
+            'status:', e?.status,
+            'code:', e?.code,
+            'message:', e?.message,
+          );
+        }
         toast.error('Sign in failed', { text2: e?.message });
       }
     } finally {
@@ -67,11 +87,11 @@ export default function ChooseAuthScreen() {
           <View style={styles.dividerLine} />
         </View>
 
-        <View style={styles.socialRow}>
-          {Platform.OS === 'ios' && (
+        <View style={styles.socialColumn}>
+          {APPLE_AUTH_ENABLED && (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Sign in with Apple"
+              accessibilityLabel="Continue with Apple"
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               onPress={() => social(signInWithApple)}
@@ -80,7 +100,8 @@ export default function ChooseAuthScreen() {
                 (pressed || busy) && styles.socialButtonPressed,
               ]}
             >
-              <Ionicons name="logo-apple" size={26} color={colors.textOnDark} />
+              <Ionicons name="logo-apple" size={22} color={colors.textOnDark} />
+              <Text style={styles.socialButtonLabel}>CONTINUE WITH APPLE</Text>
             </Pressable>
           )}
           <Pressable
@@ -94,7 +115,8 @@ export default function ChooseAuthScreen() {
               (pressed || busy) && styles.socialButtonPressed,
             ]}
           >
-            <Ionicons name="logo-google" size={24} color={colors.textOnDark} />
+            <Ionicons name="logo-google" size={20} color={colors.textOnDark} />
+            <Text style={styles.socialButtonLabel}>CONTINUE WITH GOOGLE</Text>
           </Pressable>
         </View>
       </View>
@@ -153,17 +175,23 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wider,
   },
-  socialRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
+  socialColumn: {
+    gap: spacing.sm,
   },
   socialButton: {
-    flex: 1,
+    flexDirection: 'row',
     height: 52,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  socialButtonLabel: {
+    color: colors.textOnDark,
+    fontFamily: typography.fontFamily.bold,
+    fontSize: typography.size.sm,
+    letterSpacing: typography.letterSpacing.wide,
   },
   socialButtonPressed: {
     opacity: 0.7,

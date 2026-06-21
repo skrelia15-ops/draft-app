@@ -3,26 +3,37 @@ import {
   type ReactNode,
 } from 'react';
 import { Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as WebBrowser from 'expo-web-browser';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
+// Dismiss any lingering auth browser session on warm starts (web no-op'ish
+// on native, but recommended by the expo-auth docs).
+WebBrowser.maybeCompleteAuthSession();
+
+// Deep link Supabase redirects back to after Google OAuth. Hardcoded (not
+// Linking.createURL) so it's deterministic across dev/prod and matches the
+// exact value allow-listed in Supabase → Auth → URL Configuration.
+const OAUTH_REDIRECT = 'draftapp://auth-callback';
+
 /**
- * Google Sign-In is a native module that is NOT bundled in Expo Go. Even
- * `require()`-ing it there runs its top-level
- * `TurboModuleRegistry.getEnforcing('RNGoogleSignin')`, which throws in a
- * way the dev runtime surfaces as a fatal uncaught error — so we must not
- * touch the module at all in Expo Go. We detect Expo Go and only load the
- * module in a real/dev build.
+ * Pull the OAuth result params out of the redirect URL. Supabase's implicit
+ * flow returns the session tokens in the URL fragment
+ * (`...#access_token=...&refresh_token=...`); some error cases use the query
+ * string — we read whichever is present.
  */
-const isExpoGo =
-  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-
-type GoogleSigninModule = typeof import('@react-native-google-signin/google-signin').GoogleSignin;
-
-function loadGoogleSignin(): GoogleSigninModule {
-  return require('@react-native-google-signin/google-signin').GoogleSignin;
+function parseAuthParams(url: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const marker = url.includes('#') ? '#' : url.includes('?') ? '?' : '';
+  if (!marker) return out;
+  const blob = url.slice(url.indexOf(marker) + 1);
+  for (const pair of blob.split('&')) {
+    if (!pair) continue;
+    const [k, v] = pair.split('=');
+    if (k) out[decodeURIComponent(k)] = decodeURIComponent(v ?? '');
+  }
+  return out;
 }
 
 type AuthContextValue = {
@@ -36,6 +47,8 @@ type AuthContextValue = {
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Permanently delete the signed-in user and their data, then sign out. */
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -87,38 +100,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
+  // Google via Supabase web OAuth. We avoid the native id_token flow because
+  // @react-native-google-signin embeds a nonce we can't control, which
+  // Supabase rejects. The browser flow lets Supabase manage the nonce itself.
   const signInWithGoogle = useCallback(async () => {
-    if (isExpoGo) {
-      throw new Error('Google Sign-In needs a development build (not available in Expo Go).');
-    }
-    const GoogleSignin = loadGoogleSignin();
-    await GoogleSignin.hasPlayServices();
-    const userInfo = await GoogleSignin.signIn();
-    const idToken = userInfo.data?.idToken;
-    if (!idToken) throw new Error('No Google id token');
-    const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+    const redirectTo = OAUTH_REDIRECT;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+        // Always show the Google account chooser instead of silently reusing
+        // the browser's existing session (SSO), so the user picks who to log
+        // in as every time.
+        queryParams: { prompt: 'select_account' },
+      },
+    });
     if (error) throw error;
+    if (!data?.url) throw new Error('Could not start Google sign-in.');
+    if (__DEV__) console.warn('[auth][google] oauth url →', data.url);
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      const cancelled: any = new Error('Sign in cancelled');
+      cancelled.code = 'SIGN_IN_CANCELLED';
+      throw cancelled;
+    }
+    if (result.type !== 'success' || !result.url) {
+      throw new Error('Google sign-in did not complete.');
+    }
+
+    const params = parseAuthParams(result.url);
+    if (params.error_description || params.error) {
+      throw new Error(params.error_description || params.error);
+    }
+    const { access_token, refresh_token } = params;
+    if (!access_token || !refresh_token) {
+      throw new Error('Google sign-in returned no session.');
+    }
+    const { error: sessionError } = await supabase.auth.setSession({
+      access_token,
+      refresh_token,
+    });
+    if (sessionError) throw sessionError;
   }, []);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
-  // Configure Google client IDs once — but never in Expo Go, where the
-  // native module is absent and touching it crashes the app. Also skip
-  // (and never throw) when no client IDs are set: otherwise the native
-  // `configure` aborts the whole app with "failed to determine clientID".
-  // Email/Apple sign-in still work; the Google button just won't.
-  useEffect(() => {
-    if (isExpoGo) return;
-    const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-    const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-    if (!iosClientId && !webClientId) return;
-    try {
-      loadGoogleSignin().configure({ iosClientId, webClientId });
-    } catch (e) {
-      if (__DEV__) console.warn('[auth] Google Sign-In not configured:', e);
-    }
+  // A client can't delete its own auth user (that needs the service-role
+  // key), so this calls a SECURITY DEFINER Postgres function `delete_account`
+  // that removes the user (cascading to their profile/data). See the SQL in
+  // the project setup. We sign out afterwards so the gate returns to slides.
+  const deleteAccount = useCallback(async () => {
+    const { error } = await (supabase.rpc as any)('delete_account');
+    if (error) throw error;
+    await supabase.auth.signOut();
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -130,7 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithApple: Platform.OS === 'ios' ? signInWithApple : async () => { throw new Error('Apple Sign In is iOS-only'); },
     signInWithGoogle,
     signOut,
-  }), [session, isLoading, signUpWithEmail, signInWithEmail, signInWithApple, signInWithGoogle, signOut]);
+    deleteAccount,
+  }), [session, isLoading, signUpWithEmail, signInWithEmail, signInWithApple, signInWithGoogle, signOut, deleteAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -12,6 +12,7 @@ import {
 import { router, Href } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { G, Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '@/theme';
 
 type SlideTheme = {
@@ -83,6 +84,10 @@ const slides: Slide[] = [
   },
 ];
 
+// Height of the bottom controls row (the 60pt Next button); text blocks
+// clear this so they never overlap the dots / button on any screen size.
+const CONTROLS_HEIGHT = 60;
+
 const DECORATION_PATHS = [
   'M532.205 587.897H563L522.729 509.214C465.087 396.385 385.335 332.548 301.635 332.548H261.365C178.454 332.548 98.7027 396.385 40.2707 509.214L0 587.897H30.7952C113.705 587.897 193.457 524.06 251.889 411.231L281.895 353.332C264.523 552.267 113.705 867 113.705 867H451.663C451.663 867 302.425 556.721 283.474 357.786L311.111 412.716C368.753 524.06 448.505 587.897 532.205 587.897Z',
   'M256.627 216.75L281.105 169.243L305.584 216.75C352.961 310.279 419.289 362.24 487.986 362.24H513.254L480.09 296.918C432.713 203.389 366.384 151.428 297.687 151.428H264.523C195.826 151.428 130.288 203.389 82.1207 296.918L48.9566 363.724H74.2245C142.922 363.724 209.25 310.279 256.627 216.75Z',
@@ -115,17 +120,37 @@ function ChevronRightIcon({ color, size = 28 }: { color: string; size?: number }
   );
 }
 
-function SlideContent({ slide, width }: { slide: Slide; width: number }) {
+function SlideContent({
+  slide,
+  width,
+  topInset,
+  bottomInset,
+}: {
+  slide: Slide;
+  width: number;
+  topInset: number;
+  bottomInset: number;
+}) {
+  // Text sits above the bottom controls row (dots + Next button), anchored
+  // to the safe area so it never collides with the home indicator or floats
+  // mid-screen on taller / shorter devices.
+  const textBottom = bottomInset + CONTROLS_HEIGHT + spacing['3xl'];
   return (
     <View style={[styles.slide, { width, backgroundColor: slide.theme.background }]}>
       {slide.decoration === 'left' && (
-        <View style={styles.decorationLeft} pointerEvents="none">
+        <View
+          style={[styles.decorationLeft, { top: topInset + spacing.lg }]}
+          pointerEvents="none"
+        >
           <ChevronDecoration fill={slide.decorationFill ?? colors.black} />
         </View>
       )}
 
       {slide.decoration === 'right' && (
-        <View style={styles.decorationRight} pointerEvents="none">
+        <View
+          style={[styles.decorationRight, { top: topInset + spacing.lg }]}
+          pointerEvents="none"
+        >
           <ChevronDecoration fill={slide.decorationFill ?? colors.primary} />
         </View>
       )}
@@ -145,7 +170,7 @@ function SlideContent({ slide, width }: { slide: Slide; width: number }) {
         </View>
       )}
 
-      <View style={styles.textBlock}>
+      <View style={[styles.textBlock, { bottom: textBottom }]}>
         <Text style={[styles.title, { color: slide.theme.textColor }]} allowFontScaling={false}>
           {slide.title}
         </Text>
@@ -190,6 +215,7 @@ function PageDots({
 
 export default function OnboardingSlidesScreen() {
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
 
@@ -223,24 +249,37 @@ export default function OnboardingSlidesScreen() {
         keyExtractor={(item) => item.id}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-        renderItem={({ item }) => <SlideContent slide={item} width={width} />}
+        renderItem={({ item }) => (
+          <SlideContent
+            slide={item}
+            width={width}
+            topInset={insets.top}
+            bottomInset={insets.bottom}
+          />
+        )}
       />
 
-      <View style={styles.dotsContainer} pointerEvents="none">
+      <View
+        style={[
+          styles.controlsRow,
+          { bottom: insets.bottom + spacing.lg },
+        ]}
+        pointerEvents="box-none"
+      >
         <PageDots
           count={slides.length}
           activeIndex={currentIndex}
           activeColor={theme.activeDotColor}
           inactiveColor={theme.inactiveDotColor}
         />
-      </View>
 
-      <Pressable
-        onPress={handleNext}
-        style={[styles.nextButton, { backgroundColor: theme.buttonBg }]}
-      >
-        <ChevronRightIcon color={theme.buttonChevronColor} />
-      </Pressable>
+        <Pressable
+          onPress={handleNext}
+          style={[styles.nextButton, { backgroundColor: theme.buttonBg }]}
+        >
+          <ChevronRightIcon color={theme.buttonChevronColor} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -259,23 +298,20 @@ const styles = StyleSheet.create({
   },
   decorationLeft: {
     position: 'absolute',
-    top: 78,
     left: 23,
     width: 867,
     height: 563,
   },
   decorationRight: {
     position: 'absolute',
-    top: 78,
     right: 20,
     width: 867,
     height: 563,
   },
   textBlock: {
     position: 'absolute',
-    bottom: 137,
     left: spacing.lg,
-    width: 390,
+    right: spacing.lg,
     gap: spacing.lg,
   },
   title: {
@@ -288,10 +324,13 @@ const styles = StyleSheet.create({
     fontSize: typography.size.xl,
     lineHeight: Math.round(typography.size.xl * typography.lineHeight.normal),
   },
-  dotsContainer: {
+  controlsRow: {
     position: 'absolute',
-    top: 855,
-    left: 21,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   dotsRow: {
     flexDirection: 'row',
@@ -303,9 +342,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   nextButton: {
-    position: 'absolute',
-    top: 829,
-    right: 19,
     width: 60,
     height: 60,
     borderRadius: radius['3xl'],

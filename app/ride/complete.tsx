@@ -62,7 +62,7 @@ export default function CompleteScreen() {
 
         <Text style={styles.subtitle}>
           {tooShort
-            ? 'Ride was too short to analyze. Try a longer route next time.'
+            ? 'A short spin — your ride is still logged. View insights for the details.'
             : lastFinished
               ? lastFinished.draftingFraction > 0.5
                 ? 'Strong drafting throughout. Recovery earned.'

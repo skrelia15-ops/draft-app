@@ -130,12 +130,15 @@ export default function ActiveRideScreen() {
     liveStats.remainingMeters != null
       ? formatDistanceMeters(liveStats.remainingMeters)
       : '—';
+  // ETA only when we have a routed destination and a sane estimate. On a
+  // free ride there's no ETA, so we leave it out rather than repeating the
+  // "FREE RIDE" label that already shows in the card title.
   const etaText =
     liveStats.etaSec != null && liveStats.etaSec < 60 * 60 * 12
       ? `${formatHourMin(liveStats.etaSec)} TO GO`
       : routeName
         ? 'EN ROUTE'
-        : 'FREE RIDE';
+        : null;
 
   return (
     <View
@@ -184,7 +187,8 @@ export default function ActiveRideScreen() {
             {routeName ?? 'FREE RIDE'}
           </Text>
           <Text style={styles.maneuverSub}>
-            {liveStats.drafting ? 'In the slipstream' : 'Riding solo'} · {etaText}
+            {liveStats.drafting ? 'In the slipstream' : 'Riding solo'}
+            {etaText ? ` · ${etaText}` : ''}
           </Text>
         </View>
         <View style={styles.remainingBlock}>

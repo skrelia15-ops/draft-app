@@ -2,6 +2,27 @@ import type { ExpoConfig } from 'expo/config';
 
 const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY ?? '';
 
+// Reversed iOS OAuth client id (e.g. "com.googleusercontent.apps.1234-abc").
+// Get it from the iOS OAuth client in Google Cloud Console. The google-signin
+// config plugin REQUIRES this and throws on prebuild if it's missing or
+// malformed — so we only register the plugin once it's actually set. Until
+// then Apple Sign In still works and Google falls back to its in-app guard.
+const googleIosUrlScheme = process.env.EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME ?? '';
+const googleSignInPlugin: ExpoConfig['plugins'] =
+  googleIosUrlScheme.startsWith('com.googleusercontent.apps.')
+    ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]]
+    : [];
+
+// Apple Sign In needs a paid Apple Developer membership + the "Sign in with
+// Apple" capability. Until that's set up, leave it off so the native
+// entitlement isn't added (an entitlement the App ID can't satisfy fails
+// code signing on device/EAS builds). Set EXPO_PUBLIC_APPLE_AUTH_ENABLED="true"
+// to enable the entitlement + plugin; the choose screen reads the same flag.
+const appleAuthEnabled = process.env.EXPO_PUBLIC_APPLE_AUTH_ENABLED === 'true';
+const appleSignInPlugin: ExpoConfig['plugins'] = appleAuthEnabled
+  ? ['expo-apple-authentication']
+  : [];
+
 const config: ExpoConfig = {
   name: 'draft-app',
   slug: 'draft-app',
@@ -14,6 +35,8 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.draftapp.app',
+    // Adds the "Sign in with Apple" entitlement — only when the flag is on.
+    usesAppleSignIn: appleAuthEnabled,
     config: {
       googleMapsApiKey,
     },
@@ -83,6 +106,9 @@ const config: ExpoConfig = {
           'Allow DRAFT to save your rides to Apple Health as cycling workouts.',
       },
     ],
+    // Both registered only when their feature flags are on (see top).
+    ...appleSignInPlugin,
+    ...googleSignInPlugin,
   ],
   experiments: {
     typedRoutes: true,

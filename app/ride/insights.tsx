@@ -60,27 +60,12 @@ export default function InsightsScreen() {
     );
   }
 
-  // Rides shorter than 100m don't have enough samples to compute
-  // meaningful drafting / energy / segment data — show a friendly empty
-  // state instead of confidently claiming "Drafting 100% · 30% saved" on
-  // a ride where the user barely moved.
-  if (lastFinished.distanceMeters < 100) {
-    return (
-      <View style={[styles.container, styles.emptyWrap]}>
-        <Text style={styles.title}>RIDE INSIGHTS</Text>
-        <Text style={styles.subtitle}>
-          This ride was too short to analyze. Try a longer route to unlock
-          drafting and energy stats.
-        </Text>
-        <Pressable
-          style={[styles.dashboardButton, { marginTop: spacing.xl }]}
-          onPress={handleGoHome}
-        >
-          <Text style={styles.dashboardText}>GO TO HOMEPAGE</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  // Even on a tiny ride we show the real numbers — hiding them behind a
+  // "too short to analyze" wall is worse UX than honestly displaying the
+  // distance, time and (low / zero) energy stats. Sections that genuinely
+  // have nothing to say (segments, tips, missed opportunities) already
+  // self-hide below, so a short ride degrades gracefully to core stats.
+  const isShortRide = lastFinished.distanceMeters < 100;
 
   return (
     <View style={styles.container}>
@@ -94,9 +79,11 @@ export default function InsightsScreen() {
       >
         <Text style={styles.title}>RIDE INSIGHTS</Text>
         <Text style={styles.subtitle}>
-          {insights.draftingPercent >= 60
-            ? 'You spent most of the ride in the slipstream.'
-            : 'There\u2019s still room to save more energy.'}
+          {isShortRide
+            ? 'A short spin \u2014 here\u2019s what we captured.'
+            : insights.draftingPercent >= 60
+              ? 'You spent most of the ride in the slipstream.'
+              : 'There\u2019s still room to save more energy.'}
         </Text>
 
         <View style={styles.coreStatsGrid}>

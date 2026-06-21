@@ -41,7 +41,7 @@ function splitName(fullName: string): { first: string; last: string } {
 export default function ProfileScreen() {
   const { history } = useRide();
   const { profile } = useProfile();
-  const { signOut } = useAuth();
+  const { signOut, deleteAccount } = useAuth();
   const compatibility = useMemo(() => getCompatibility(history), [history]);
   const { first, last } = splitName(profile.name);
   const bike = profile.bike;
@@ -92,6 +92,28 @@ export default function ProfileScreen() {
             // The root gate redirects to the slides once signed out.
             await signOut();
             toast.success('Logged out');
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account and all your ride data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              toast.success('Account deleted');
+            } catch (e: any) {
+              toast.error('Could not delete account', { text2: e?.message });
+            }
           },
         },
       ],
@@ -261,6 +283,16 @@ export default function ProfileScreen() {
         >
           <Logout3 size={18} color={colors.textMuted} />
           <Text style={styles.logoutText}>LOG OUT</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.deleteButton}
+          onPress={handleDeleteAccount}
+          accessibilityRole="button"
+          accessibilityLabel="Delete account"
+          hitSlop={8}
+        >
+          <Text style={styles.deleteText}>Delete account</Text>
         </Pressable>
       </View>
     </View>
@@ -515,5 +547,19 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.bold,
     fontSize: typography.size.xs,
     letterSpacing: typography.letterSpacing.wider,
+  },
+  // Deliberately low-emphasis: a small, dim tertiary link under Log out —
+  // destructive but not visually loud (gated behind a confirm Alert).
+  deleteButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing['2xs'],
+  },
+  deleteText: {
+    color: colors.textMuted,
+    opacity: 0.5,
+    fontFamily: typography.fontFamily.medium,
+    fontSize: typography.size['2xs'],
+    letterSpacing: typography.letterSpacing.wide,
   },
 });
